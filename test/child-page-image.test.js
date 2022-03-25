@@ -1,0 +1,21 @@
+/**
+ * @author: oldj
+ * @homepage: https://oldj.net
+ */
+
+const assert = require('assert')
+const { epubGen } = require('../dist/index')
+const data = require('./data/1.json')
+
+describe('Child page image', () => {
+  it.only('should has image', async () => {
+    let out = { options: {} }
+    try {
+      out = await epubGen({ ...data }, 'cpi.epub')
+    } catch (e) {
+      console.error('Error 24: ' + e.message)
+    }
+    assert.equal(out.success, true)
+    assert.equal(typeof out.options.tmpDir, 'string')
+  }).timeout(60 * 1000)
+})

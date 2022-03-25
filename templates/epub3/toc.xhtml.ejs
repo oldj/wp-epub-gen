@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="<%- lang %>"
+      lang="<%- lang %>">
+<head>
+    <title><%= title %></title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
+</head>
+<body>
+<h1 class="h1"><%= tocTitle %></h1>
+<nav id="toc" class="TOC" epub:type="toc">
+    <% var nodes_1 = content.filter(item => !item.excludeFromToc && item.beforeToc) %>
+    <% var nodes_2 = content.filter(item => !item.excludeFromToc && !item.beforeToc) %>
+    <% function renderToc(nodes, indent = 0) { %>
+        <ol>
+            <% nodes.forEach(function(content, index){ %>
+                <li class="table-of-content">
+                    <a href="<%= content.href %>"><%= (content.title || "Chapter " + (1 + index)) %>
+                        <% if(content.author.length){ %> - <small
+                                class="toc-author"><%= content.author.join(",") %></small>
+                        <% } %>
+                        <% if(content.url){ %><span class="toc-link"><%= content.url %></span>
+                        <% } %>
+                    </a>
+                    <% if (Array.isArray(content.children) && content.children.length > 0) { %>
+                        <% renderToc(content.children, indent + 1) %>
+                    <% } %>
+                </li>
+            <% }) %>
+        </ol>
+    <% } %>
+    <% renderToc(nodes_1) %>
+    <% renderToc(nodes_2) %>
+</nav>
+
+</body>
+</html>

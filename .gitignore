@@ -1,0 +1,11 @@
+.idea
+node_modules
+*.js.map
+
+test.epub
+*.coffee
+
+tmpDir
+*.epub
+
+dist
