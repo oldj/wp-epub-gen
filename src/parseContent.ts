@@ -280,6 +280,7 @@ export default function parseContent(
   }
 
   $($('*').get().reverse()).each(function (elemIndex, elem) {
+    // @ts-ignore
     let attrs = elem.attribs
     // @ts-ignore
     let that: CheerioElement = this

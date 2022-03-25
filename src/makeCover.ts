@@ -10,7 +10,7 @@ import * as request from 'superagent'
 import { IEpubData } from './types'
 import { USER_AGENT } from './utils'
 
-export default async function makeCover(data: IEpubData) {
+export default async function makeCover(data: IEpubData): Promise<void> {
   let { cover, _coverExtension, log } = data
   if (!cover) return
 

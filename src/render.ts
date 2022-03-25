@@ -32,7 +32,7 @@ export async function render(data: IEpubData): Promise<void> {
   }
 }
 
-async function genEpub(epubData: IEpubData) {
+async function genEpub(epubData: IEpubData): Promise<void> {
   let { log, dir, output } = epubData
 
   let archive = archiver('zip', { zlib: { level: 9 } })

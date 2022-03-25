@@ -3,10 +3,10 @@
  * @homepage: https://oldj.net
  */
 
-const assert = require('assert')
-const { epubGen } = require('../dist/index')
-const { errors } = require('../dist/errors')
-const data = require('./data/1.json')
+import { assert } from 'chai'
+import { epubGen } from '../dist/index'
+import { errors } from '../dist/errors'
+import * as data from './data/1.json'
 
 describe('Basic', () => {
   it('no output path error', async () => {

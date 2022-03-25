@@ -3,9 +3,9 @@
  * @homepage: https://oldj.net
  */
 
-const assert = require('assert')
-const { epubGen } = require('../dist/index')
-const data = require('./data/1.json')
+import { assert } from 'chai'
+import { epubGen } from '../dist/index'
+import * as data from './data/1.json'
 
 describe('Child page image', () => {
   it.only('should has image', async () => {
