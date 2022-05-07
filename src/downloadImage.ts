@@ -25,6 +25,14 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
   let filename = path.join(image_dir, options.id + '.' + options.extension)
   if (url.startsWith('file://') || url.startsWith('/')) {
     let auxPath = url.replace(/^file:\/\//i, '')
+
+    if (process.platform === 'win32') {
+      // Windows 下，把 /C:/ 转换成 C:/ 这样的形式
+      if (auxPath.match(/^\/[a-zA-Z]:/)) {
+        auxPath = auxPath.replace(/^\//, '')
+      }
+    }
+
     log(`[Copy 1] '${auxPath}' to '${filename}'`)
     if (fs.existsSync(auxPath)) {
       try {
