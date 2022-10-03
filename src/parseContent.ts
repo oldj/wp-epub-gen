@@ -21,6 +21,7 @@ export default function parseContent(
 
   if (!chapter.filename) {
     let titleSlug = uslug(removeDiacritics(chapter.title || 'no title'))
+    titleSlug = titleSlug.replace(/[\/\\]/g, '_')
     chapter.href = `${index}_${titleSlug}.xhtml`
     chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', chapter.href)
   } else {
