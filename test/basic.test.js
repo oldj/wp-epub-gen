@@ -4,8 +4,8 @@
  */
 
 import { assert } from 'chai'
-import { epubGen } from '../dist/index'
-import { errors } from '../dist/errors'
+import { epubGen } from '../build/index'
+import { errors } from '../build/errors'
 import * as data from './data/1.json'
 
 describe('Basic', () => {

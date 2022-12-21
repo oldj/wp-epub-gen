@@ -4,7 +4,7 @@
  */
 
 import { assert } from 'chai'
-import { epubGen } from '../dist/index'
+import { epubGen } from '../build/index'
 import * as data from './data/1.json'
 
 describe('Child page image', () => {

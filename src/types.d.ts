@@ -45,7 +45,7 @@ export interface IEpubData extends IEpubGenOptions {
   baseDir: string
   _coverMediaType?: string
   _coverExtension?: string
-  log: (msg) => void
+  log: (msg: any) => void
   content: IChapterData[]
   timeoutSeconds: number
 }
