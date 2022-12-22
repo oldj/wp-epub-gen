@@ -4,9 +4,9 @@
  * @homepage: https://oldj.net
  */
 
-import * as archiver from 'archiver'
-import * as fs from 'fs-extra'
-import * as path from 'path'
+import archiver from 'archiver'
+import fs from 'fs-extra'
+import path from 'path'
 import { downloadAllImages } from './downloadImage'
 import { generateTempFile } from './generateTempFile'
 import makeCover from './makeCover'

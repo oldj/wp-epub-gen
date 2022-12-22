@@ -18,9 +18,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
 
   const templates_dir = path.join(epubData.baseDir, 'templates')
 
-  epubData.css =
-    epubData.css ||
-    (await readFile(path.join(epubData.baseDir, 'templates', 'template.css'), 'utf-8'))
+  epubData.css = epubData.css || (await readFile(path.join(templates_dir, 'template.css'), 'utf-8'))
   await writeFile(path.join(oebps_dir, 'style.css'), epubData.css, 'utf-8')
 
   if (epubData.fonts?.length) {

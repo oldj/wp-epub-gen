@@ -1,6 +1,6 @@
 {
   "name": "wp-epub-gen",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Epub generator.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -8,7 +8,8 @@
     "tsc": "tsc",
     "test": "mocha -r espower-typescript/guess -r tsconfig-paths/register test/*.test.js",
     "tt": "npm run build && node ./test/tt.js",
-    "build": "rm -rf ./build && tsc",
+    "build": "cross-env NODE_ENV=production vite build --config vite.config.ts",
+    "build:0": "rm -rf ./build && tsc",
     "bt": "npm run build && npm run test",
     "w": "tsc -w",
     "p": "npm run build && npm run test && npm publish --access public"
@@ -24,9 +25,6 @@
   },
   "homepage": "https://github.com/oldj/wp-epub-gen#readme",
   "dependencies": {
-    "@types/diacritics": "^1.3.1",
-    "@types/uslug": "^1.0.1",
-    "@types/uuid": "^9.0.0",
     "archiver": "^5.3.1",
     "cheerio": "^0.22.0",
     "diacritics": "^1.3.0",
@@ -41,10 +39,13 @@
   "devDependencies": {
     "@types/archiver": "^5.3.1",
     "@types/cheerio": "^0.22.31",
+    "@types/diacritics": "^1.3.1",
     "@types/ejs": "^3.1.1",
     "@types/fs-extra": "^9.0.13",
     "@types/mime": "^3.0.1",
     "@types/superagent": "^4.1.16",
+    "@types/uslug": "^1.0.1",
+    "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^5.47.0",
     "@typescript-eslint/parser": "^5.47.0",
     "chai": "^4.3.7",
@@ -57,6 +58,9 @@
     "prettier": "^2.8.1",
     "ts-loader": "^9.4.2",
     "tsconfig-paths": "^4.1.1",
-    "typescript": "^4.9.4"
+    "typescript": "^4.9.4",
+    "vite": "^4.0.3",
+    "vite-plugin-dts": "^1.7.1",
+    "vite-tsconfig-paths": "^4.0.3"
   }
 }

@@ -150,3 +150,4 @@ export async function epubGen(options: IEpubGenOptions, output?: string): Promis
 }
 
 export const gen = epubGen
+export { errors } from './errors'

@@ -4,11 +4,11 @@
  * @homepage: https://oldj.net
  */
 
-import * as cheerio from 'cheerio'
+import cheerio from 'cheerio'
 import { remove as removeDiacritics } from 'diacritics'
-import * as mime from 'mime'
-import * as path from 'path'
-import * as uslug from 'uslug'
+import mime from 'mime'
+import path from 'path'
+import uslug from 'uslug'
 import { v4 as uuidv4 } from 'uuid'
 import { IChapter, IChapterData, IEpubData, IEpubImage } from './types'
 

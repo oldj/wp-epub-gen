@@ -5,7 +5,7 @@
 
 import { assert } from 'chai'
 import { epubGen } from '../build/index'
-import { errors } from '../build/errors'
+import { errors } from '../build/index'
 import * as data from './data/1.json'
 
 describe('Basic', () => {
