@@ -4,6 +4,7 @@
  * @homepage: https://oldj.net
  */
 
+import safeFineName from '@/libs/safeFineName'
 import cheerio from 'cheerio'
 import { remove as removeDiacritics } from 'diacritics'
 import mime from 'mime'
@@ -18,19 +19,21 @@ export default function parseContent(
   epubConfigs: IEpubData,
 ): IChapterData {
   let chapter: IChapterData = { ...content } as IChapterData
+  let { filename } = chapter
 
-  if (!chapter.filename) {
+  if (!filename) {
     let titleSlug = uslug(removeDiacritics(chapter.title || 'no title'))
     titleSlug = titleSlug.replace(/[\/\\]/g, '_')
     chapter.href = `${index}_${titleSlug}.xhtml`
     chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', chapter.href)
   } else {
-    let is_xhtml = chapter.filename.endsWith('.xhtml')
-    chapter.href = is_xhtml ? chapter.filename : `${chapter.filename}.xhtml`
+    filename = safeFineName(filename)
+    let is_xhtml = filename.endsWith('.xhtml')
+    chapter.href = is_xhtml ? filename : `${filename}.xhtml`
     if (is_xhtml) {
-      chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', chapter.filename)
+      chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', filename)
     } else {
-      chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', `${chapter.filename}.xhtml`)
+      chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', `${filename}.xhtml`)
     }
   }
 

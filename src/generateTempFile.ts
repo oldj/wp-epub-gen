@@ -9,7 +9,7 @@ import * as entities from 'entities'
 import * as fs from 'fs-extra'
 import * as path from 'path'
 import { IChapterData, IEpubData } from './types'
-import { readFile, simpleMinifier, writeFile } from './utils'
+import { readFile, simpleMinifier, writeFile } from './libs/utils'
 
 export const generateTempFile = async (epubData: IEpubData) => {
   let { log } = epubData

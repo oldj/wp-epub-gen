@@ -80,7 +80,7 @@ epubGen(option).then(
     - `appendChapterTitle`:
         optional, Automatically append the chapter title at the beginning of current chapter, this value will overwrite the global `appendChapterTitles`.
 - `verbose`:
-    specify whether or not to console.log progress messages, default: false.
+    specify whether to console.log progress messages, default: false.
 - `timeoutSeconds`:
     specify timeout in seconds, `0` means no timeout, default: 0.
 - `tocAutoNumber`:

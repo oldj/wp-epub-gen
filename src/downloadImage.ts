@@ -8,7 +8,7 @@ import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as request from 'superagent'
 import { IEpubData, IEpubImage } from './types'
-import { USER_AGENT } from './utils'
+import { USER_AGENT } from './libs/utils'
 
 const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<void> => {
   let { url } = options

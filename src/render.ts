@@ -11,7 +11,7 @@ import { downloadAllImages } from './downloadImage'
 import { generateTempFile } from './generateTempFile'
 import makeCover from './makeCover'
 import { IEpubData } from './types'
-import { fileIsStable } from './utils'
+import { fileIsStable } from './libs/utils'
 
 export async function render(data: IEpubData): Promise<void> {
   let { log } = data
