@@ -6,3 +6,5 @@ node_modules
 /local
 /scripts
 /src
+
+*.epub
