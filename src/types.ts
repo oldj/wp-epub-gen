@@ -1,5 +1,4 @@
 /**
- * types.ts
  * @author: oldj
  * @homepage: https://oldj.net
  */

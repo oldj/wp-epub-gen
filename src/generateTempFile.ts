@@ -1,24 +1,30 @@
 /**
- * generateTempFile
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
-import * as ejs from 'ejs'
+import ejs from 'ejs'
 import * as entities from 'entities'
-import * as fs from 'fs-extra'
-import * as path from 'path'
+import fs from 'fs-extra'
+import path from 'path'
+import { simpleMinifier, writeFile } from './libs/utils'
+import {
+  epub2_content_opf_ejs,
+  epub2_toc_xhtml_ejs,
+  epub3_content_opf_ejs,
+  epub3_toc_xhtml_ejs,
+  template_css,
+  toc_ncx_ejs,
+} from './templates'
 import { IChapterData, IEpubData } from './types'
-import { readFile, simpleMinifier, writeFile } from './libs/utils'
 
 export const generateTempFile = async (epubData: IEpubData) => {
   let { log } = epubData
   let oebps_dir = path.join(epubData.dir, 'OEBPS')
   await fs.ensureDir(oebps_dir)
 
-  const templates_dir = path.join(epubData.baseDir, 'templates')
-
-  epubData.css = epubData.css || (await readFile(path.join(templates_dir, 'template.css'), 'utf-8'))
+  // 使用嵌入的模板内容，无需文件路径依赖
+  epubData.css = epubData.css || template_css
   await writeFile(path.join(oebps_dir, 'style.css'), epubData.css, 'utf-8')
 
   if (epubData.fonts?.length) {
@@ -103,40 +109,43 @@ export const generateTempFile = async (epubData: IEpubData) => {
     )
   }
 
-  let opfPath =
-    epubData.customOpfTemplatePath ||
-    path.join(templates_dir, `epub${epubData.version}`, 'content.opf.ejs')
-  if (!fs.existsSync(opfPath)) {
-    throw new Error('Custom file to OPF template not found.')
+  // 获取模板内容（支持自定义模板文件路径）
+  let opfTemplate: string
+  let ncxTocTemplate: string
+  let htmlTocTemplate: string
+
+  if (epubData.customOpfTemplatePath && fs.existsSync(epubData.customOpfTemplatePath)) {
+    const { readFile } = require('./libs/utils')
+    opfTemplate = await readFile(epubData.customOpfTemplatePath, 'utf-8')
+  } else {
+    opfTemplate = epubData.version === 2 ? epub2_content_opf_ejs : epub3_content_opf_ejs
   }
 
-  let ncxTocPath = epubData.customNcxTocTemplatePath || path.join(templates_dir, `toc.ncx.ejs`)
-  if (!fs.existsSync(ncxTocPath)) {
-    throw new Error('Custom file the NCX toc template not found.')
+  if (epubData.customNcxTocTemplatePath && fs.existsSync(epubData.customNcxTocTemplatePath)) {
+    const { readFile } = require('./libs/utils')
+    ncxTocTemplate = await readFile(epubData.customNcxTocTemplatePath, 'utf-8')
+  } else {
+    ncxTocTemplate = toc_ncx_ejs
   }
 
-  let htmlTocPath =
-    epubData.customHtmlTocTemplatePath ||
-    path.join(templates_dir, `epub${epubData.version}`, 'toc.xhtml.ejs')
-  if (!fs.existsSync(htmlTocPath)) {
-    throw new Error('Custom file to HTML toc template not found.')
+  if (epubData.customHtmlTocTemplatePath && fs.existsSync(epubData.customHtmlTocTemplatePath)) {
+    const { readFile } = require('./libs/utils')
+    htmlTocTemplate = await readFile(epubData.customHtmlTocTemplatePath, 'utf-8')
+  } else {
+    htmlTocTemplate = epubData.version === 2 ? epub2_toc_xhtml_ejs : epub3_toc_xhtml_ejs
   }
 
   let toc_depth = 1
-  fs.writeFileSync(
-    path.join(oebps_dir, 'content.opf'),
-    await ejs.renderFile(opfPath, epubData),
-    'utf-8',
-  )
+  fs.writeFileSync(path.join(oebps_dir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8')
   fs.writeFileSync(
     path.join(oebps_dir, 'toc.ncx'),
-    await ejs.renderFile(ncxTocPath, { ...epubData, toc_depth }),
+    ejs.render(ncxTocTemplate, { ...epubData, toc_depth }),
     'utf-8',
   )
   // 说明：toc.xhtml 的内容在 macOS 自带的 Books 会被当作目录显示，如果空格太多，目录显示可能会不正常，因此这儿简单去掉了不必要的空格
   fs.writeFileSync(
     path.join(oebps_dir, 'toc.xhtml'),
-    simpleMinifier(await ejs.renderFile(htmlTocPath, epubData)),
+    simpleMinifier(ejs.render(htmlTocTemplate, epubData)),
     'utf-8',
   )
 }

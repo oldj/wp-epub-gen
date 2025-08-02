@@ -1,5 +1,4 @@
 /**
- * safeFineName.ts
  * @author: oldj
  * @homepage: https://oldj.net
  */

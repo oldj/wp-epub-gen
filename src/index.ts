@@ -1,19 +1,25 @@
 /**
- * index.ts
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
-import * as mime from 'mime'
-import * as os from 'os'
-import * as path from 'path'
+// @ts-ignore - Direct import to avoid complex namespace processing
+const mimeModule = require('mime/lite')
+const mime = mimeModule.default || mimeModule
+import os from 'os'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { errors } from './errors'
 import parseContent from './parseContent'
 import { render } from './render'
 import { IEpubData, IEpubGenOptions, IOut } from './types'
 
-const baseDir = path.dirname(__dirname)
+// 在 ES 模块中获取当前文件和目录路径
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+// 使用当前目录作为基础路径（模板内容已嵌入，无需文件依赖）
+const baseDir = __dirname
 
 function result(success: boolean, message?: string, options?: IEpubGenOptions): IOut {
   if (options && options.verbose) {
@@ -151,3 +157,6 @@ export async function epubGen(options: IEpubGenOptions, output?: string): Promis
 
 export const gen = epubGen
 export { errors } from './errors'
+
+// 导出所有类型，让用户可以直接从主入口导入
+export type { IEpubImage, IEpubGenOptions, IEpubData, IChapter, IChapterData, IOut } from './types'

@@ -1,13 +1,14 @@
 /**
- * parseContent
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
 import safeFineName from '@/libs/safeFineName'
-import cheerio from 'cheerio'
+import * as cheerio from 'cheerio'
 import { remove as removeDiacritics } from 'diacritics'
-import mime from 'mime'
+// @ts-ignore - Direct import to avoid complex namespace processing
+const mimeModule = require('mime/lite')
+const mime = mimeModule.default || mimeModule
 import path from 'path'
 import uslug from 'uslug'
 import { v4 as uuidv4 } from 'uuid'
@@ -267,8 +268,10 @@ export default function parseContent(
   ]
 
   let $ = cheerio.load(chapter.data, {
-    lowerCaseTags: true,
-    recognizeSelfClosing: true,
+    xml: {
+      lowerCaseTags: true,
+      recognizeSelfClosing: true,
+    },
   })
 
   // only body innerHTML is allowed
@@ -277,8 +280,10 @@ export default function parseContent(
     let html = body.html()
     if (html) {
       $ = cheerio.load(html, {
-        lowerCaseTags: true,
-        recognizeSelfClosing: true,
+        xml: {
+          lowerCaseTags: true,
+          recognizeSelfClosing: true,
+        },
       })
     }
   }
