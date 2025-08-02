@@ -1,5 +1,4 @@
 /**
- * t.js
  * @author: oldj
  * @homepage: https://oldj.net
  */

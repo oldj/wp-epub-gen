@@ -23,19 +23,27 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
 
   let filename = path.join(image_dir, options.id + '.' + options.extension)
   if (url.startsWith('file://') || url.startsWith('/')) {
-    let auxPath = url.replace(/^file:\/\//i, '')
+    let aux_path = url.replace(/^file:\/\//i, '')
+
+    // 对 URL 编码的路径进行解码（如 %20 转换为空格）
+    try {
+      aux_path = decodeURIComponent(aux_path)
+    } catch (e) {
+      // 如果解码失败，继续使用原路径
+      log(`[URL Decode Warning] Failed to decode path: ${aux_path}`)
+    }
 
     if (process.platform === 'win32') {
       // Windows 下，把 /C:/ 转换成 C:/ 这样的形式
-      if (auxPath.match(/^\/[a-zA-Z]:/)) {
-        auxPath = auxPath.replace(/^\//, '')
+      if (aux_path.match(/^\/[a-zA-Z]:/)) {
+        aux_path = aux_path.replace(/^\//, '')
       }
     }
 
-    log(`[Copy 1] '${auxPath}' to '${filename}'`)
-    if (fs.existsSync(auxPath)) {
+    log(`[Copy 1] '${aux_path}' to '${filename}'`)
+    if (fs.existsSync(aux_path)) {
       try {
-        fs.copySync(auxPath, filename)
+        fs.copySync(aux_path, filename)
       } catch (e) {
         log('[Copy 1 Error] ' + e.message)
       }
