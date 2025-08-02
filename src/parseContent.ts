@@ -4,7 +4,7 @@
  */
 
 import safeFineName from '@/libs/safeFineName'
-import cheerio from 'cheerio'
+import * as cheerio from 'cheerio'
 import { remove as removeDiacritics } from 'diacritics'
 // @ts-ignore - Direct import to avoid complex namespace processing
 const mimeModule = require('mime/lite')

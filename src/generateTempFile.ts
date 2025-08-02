@@ -4,7 +4,7 @@
  */
 
 import ejs from 'ejs'
-import entities from 'entities'
+import * as entities from 'entities'
 import fs from 'fs-extra'
 import path from 'path'
 import { simpleMinifier, writeFile } from './libs/utils'
