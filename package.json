@@ -10,7 +10,6 @@
     "test": "vitest --watch=false run",
     "tt": "npm run build && node ./test/tt.js",
     "build": "cross-env NODE_ENV=production vite build --config vite.config.ts",
-    "build:0": "rm -rf ./build && tsc",
     "bt": "npm run build && npm run test",
     "w": "tsc -w",
     "p": "npm run build && npm run test && npm publish --access public"
