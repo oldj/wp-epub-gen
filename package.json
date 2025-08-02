@@ -3,6 +3,7 @@
   "version": "0.3.0",
   "description": "Epub generator.",
   "main": "build/index.js",
+  "module": "build/index.mjs",
   "types": "build/index.d.ts",
   "scripts": {
     "tsc": "tsc",

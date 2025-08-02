@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "module": "commonjs",
+    "target": "es2020",
+    "module": "es2020",
     "allowJs": true,
     "sourceMap": true,
     "declaration": true,
@@ -14,11 +14,13 @@
     "noImplicitThis": true,
     "noImplicitReturns": true,
     "moduleResolution": "node",
+    "lib": [
+      "es2020"
+    ],
     "experimentalDecorators": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "plugins": [
-    ],
+    "plugins": [],
     "baseUrl": "./",
     "paths": {
       "@/*": [
@@ -34,6 +36,5 @@
     "test",
     "dist"
   ],
-  "externals": {
-  }
+  "externals": {}
 }
