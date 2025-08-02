@@ -4,7 +4,7 @@
  * @homepage: https://oldj.net
  */
 
-const {epubGen} = require('../dist/index')
+const {epubGen} = require('../build/index')
 const data = require('./data/1.json')
 
 ;(async () => {

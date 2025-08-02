@@ -1,10 +1,9 @@
 /**
- * utils
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
-import * as fs from 'fs'
+import fs from 'fs'
 import { promisify } from 'util'
 
 export const readFile = promisify(fs.readFile)

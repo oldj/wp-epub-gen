@@ -1,13 +1,12 @@
 /**
- * generateTempFile
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
-import * as ejs from 'ejs'
-import * as entities from 'entities'
-import * as fs from 'fs-extra'
-import * as path from 'path'
+import ejs from 'ejs'
+import entities from 'entities'
+import fs from 'fs-extra'
+import path from 'path'
 import { IChapterData, IEpubData } from './types'
 import { readFile, simpleMinifier, writeFile } from './libs/utils'
 

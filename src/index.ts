@@ -1,12 +1,13 @@
 /**
- * index.ts
  * @author: oldj
  * @homepage: https://oldj.net
  */
 
-import * as mime from 'mime'
-import * as os from 'os'
-import * as path from 'path'
+// @ts-ignore - Direct import to avoid complex namespace processing
+const mimeModule = require('mime/lite')
+const mime = mimeModule.default || mimeModule
+import os from 'os'
+import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { errors } from './errors'
 import parseContent from './parseContent'
