@@ -152,3 +152,6 @@ export async function epubGen(options: IEpubGenOptions, output?: string): Promis
 
 export const gen = epubGen
 export { errors } from './errors'
+
+// 导出所有类型，让用户可以直接从主入口导入
+export type { IEpubImage, IEpubGenOptions, IEpubData, IChapter, IChapterData, IOut } from './types'
