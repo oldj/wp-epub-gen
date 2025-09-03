@@ -96,7 +96,7 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
 `
   } else {
     data.docHeader = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="#{self.options.lang}">
 `
   }
@@ -159,4 +159,4 @@ export const gen = epubGen
 export { errors } from './errors'
 
 // 导出所有类型，让用户可以直接从主入口导入
-export type { IEpubImage, IEpubGenOptions, IEpubData, IChapter, IChapterData, IOut } from './types'
+export type { IChapter, IChapterData, IEpubData, IEpubGenOptions, IEpubImage, IOut } from './types'

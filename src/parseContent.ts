@@ -6,13 +6,13 @@
 import safeFineName from '@/libs/safeFineName'
 import * as cheerio from 'cheerio'
 import { remove as removeDiacritics } from 'diacritics'
-// @ts-ignore - Direct import to avoid complex namespace processing
-const mimeModule = require('mime/lite')
-const mime = mimeModule.default || mimeModule
 import path from 'path'
 import uslug from 'uslug'
 import { v4 as uuidv4 } from 'uuid'
 import { IChapter, IChapterData, IEpubData, IEpubImage } from './types'
+// @ts-ignore - Direct import to avoid complex namespace processing
+const mimeModule = require('mime/lite')
+const mime = mimeModule.default || mimeModule
 
 export default function parseContent(
   content: IChapter,
