@@ -8,12 +8,12 @@ import fs from 'fs-extra'
 import path from 'path'
 import { downloadAllImages } from './downloadImage'
 import { generateTempFile } from './generateTempFile'
+import { fileIsStable } from './libs/utils'
 import makeCover from './makeCover'
 import { IEpubData } from './types'
-import { fileIsStable } from './libs/utils'
 
 export async function render(data: IEpubData): Promise<void> {
-  let { log } = data
+  const { log } = data
 
   log('Generating Template Files...')
   await generateTempFile(data)
@@ -32,10 +32,10 @@ export async function render(data: IEpubData): Promise<void> {
 }
 
 async function genEpub(epubData: IEpubData): Promise<void> {
-  let { log, dir, output } = epubData
+  const { log, dir, output } = epubData
 
-  let archive = archiver('zip', { zlib: { level: 9 } })
-  let outputStream = fs.createWriteStream(epubData.output)
+  const archive = archiver('zip', { zlib: { level: 9 } })
+  const outputStream = fs.createWriteStream(epubData.output)
   log('Zipping temp dir to ' + output)
 
   return new Promise((resolve, reject) => {
@@ -46,7 +46,7 @@ async function genEpub(epubData: IEpubData): Promise<void> {
       // setTimeout(() => log(fs.statSync(epubData.output).size), 1)
       // setTimeout(() => log(fs.statSync(epubData.output).size), 100)
       // setTimeout(() => log(fs.statSync(epubData.output).size), 1000)
-      let stable = await fileIsStable(epubData.output)
+      const stable = await fileIsStable(epubData.output)
       if (!stable) {
         log('Output epub file is not stable!')
       }

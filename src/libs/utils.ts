@@ -15,12 +15,12 @@ export const USER_AGENT =
 export const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function fileIsStable(filename: string, max_wait: number = 30000): Promise<boolean> {
-  let start_time = new Date().getTime()
+  const start_time = new Date().getTime()
   let last_size = fs.statSync(filename).size
 
   while (new Date().getTime() - start_time <= max_wait) {
     await wait(1000)
-    let size = fs.statSync(filename).size
+    const size = fs.statSync(filename).size
     if (size === last_size) return true
     last_size = size
   }
