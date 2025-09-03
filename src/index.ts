@@ -3,9 +3,14 @@
  * @homepage: https://oldj.net
  */
 
-// @ts-ignore - Direct import to avoid complex namespace processing
-const mimeModule = require('mime/lite')
-const mime = mimeModule.default || mimeModule
+// 改进类型安全：为 mime 模块创建类型声明
+interface MimeModule {
+  getType(path: string): string | null
+  getExtension(type: string): string | null
+}
+
+const mimeModule = require('mime/lite') as MimeModule | { default: MimeModule }
+const mime: MimeModule = (mimeModule as any).default || mimeModule
 import os from 'os'
 import path from 'path'
 import { fileURLToPath } from 'url'
