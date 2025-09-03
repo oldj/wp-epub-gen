@@ -1,8 +1,8 @@
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import * as path from 'path'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 import tsconfigPaths from 'vite-tsconfig-paths'
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs'
 
 /**
  * 生成模板文件的 TypeScript 代码
@@ -76,15 +76,19 @@ export default defineConfig({
   base: './',
   build: {
     rollupOptions: {
-      input: {
-        index: path.join(__dirname, 'src', 'index.ts'),
+      output: {
+        exports: 'named',
       },
     },
     lib: {
       entry: path.join(__dirname, 'src', 'index.ts'),
       name: 'index',
       formats: ['cjs', 'es'],
-      fileName: (format) => `index.${format === 'es' ? 'mjs' : 'js'}`,
+      // fileName: (format) => {
+      //   if (format === 'es') return 'index.mjs'
+      //   if (format === 'cjs') return 'index.js'
+      //   return `index.${format}`
+      // },
     },
     outDir: path.join(__dirname, 'build'),
     minify: false,

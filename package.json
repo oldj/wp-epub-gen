@@ -1,11 +1,18 @@
 {
   "name": "wp-epub-gen",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Epub generator.",
   "type": "module",
-  "main": "build/index.js",
-  "module": "build/index.mjs",
+  "main": "build/index.cjs",
+  "module": "build/index.js",
   "types": "build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.js",
+      "require": "./build/index.cjs"
+    }
+  },
   "scripts": {
     "tsc": "tsc",
     "test": "vitest --watch=false run",
