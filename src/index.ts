@@ -166,5 +166,11 @@ export async function epubGen(options: IEpubGenOptions, configs?: IGenConfigs): 
 export const gen = epubGen
 export { errors } from './errors'
 
-// 导出所有类型，让用户可以直接从主入口导入
+// 添加默认导出以改善 CommonJS 兼容性
+export default {
+  epubGen,
+  gen,
+  errors
+}
+
 export type { IChapter, IChapterData, IEpubData, IEpubGenOptions, IEpubImage, IOut } from './types'
