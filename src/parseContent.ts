@@ -14,12 +14,15 @@ import { IChapter, IChapterData, IEpubData, IEpubImage } from './types'
 const mimeModule = require('mime/lite')
 const mime = mimeModule.default || mimeModule
 
-export default function parseContent(
+/**
+ * 初始化章节基本信息，包括文件路径、ID等
+ */
+function initializeChapterInfo(
   content: IChapter,
   index: number | string,
   epubConfigs: IEpubData,
 ): IChapterData {
-  let chapter: IChapterData = { ...content } as IChapterData
+  const chapter: IChapterData = { ...content } as IChapterData
   let { filename } = chapter
 
   if (!filename) {
@@ -29,7 +32,7 @@ export default function parseContent(
     chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', chapter.href)
   } else {
     filename = safeFineName(filename)
-    let is_xhtml = filename.endsWith('.xhtml')
+    const is_xhtml = filename.endsWith('.xhtml')
     chapter.href = is_xhtml ? filename : `${filename}.xhtml`
     if (is_xhtml) {
       chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', filename)
@@ -43,14 +46,25 @@ export default function parseContent(
   chapter.excludeFromToc = chapter.excludeFromToc || false
   chapter.beforeToc = chapter.beforeToc || false
 
-  // fix author array
+  return chapter
+}
+
+/**
+ * 规范化作者信息为数组格式
+ */
+function normalizeAuthorInfo(chapter: IChapterData): void {
   if (chapter.author && typeof chapter.author === 'string') {
     chapter.author = [chapter.author]
   } else if (!chapter.author || !Array.isArray(chapter.author)) {
     chapter.author = []
   }
+}
 
-  let allowedAttributes = [
+/**
+ * 获取允许的HTML属性列表
+ */
+function getAllowedAttributes(): string[] {
+  return [
     'content',
     'alt',
     'id',
@@ -191,7 +205,13 @@ export default function parseContent(
     'epub:type',
     'epub:prefix',
   ]
-  let allowedXhtml11Tags = [
+}
+
+/**
+ * 获取XHTML 1.1允许的标签列表
+ */
+function getAllowedXhtml11Tags(): string[] {
+  return [
     'div',
     'p',
     'h1',
@@ -266,8 +286,13 @@ export default function parseContent(
     'tt',
     'var',
   ]
+}
 
-  let $ = cheerio.load(chapter.data, {
+/**
+ * 加载并处理HTML内容，提取body部分
+ */
+function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
+  let $ = cheerio.load(data, {
     xml: {
       lowerCaseTags: true,
       recognizeSelfClosing: true,
@@ -275,9 +300,9 @@ export default function parseContent(
   })
 
   // only body innerHTML is allowed
-  let body = $('body')
+  const body = $('body')
   if (body.length) {
-    let html = body.html()
+    const html = body.html()
     if (html) {
       $ = cheerio.load(html, {
         xml: {
@@ -288,12 +313,26 @@ export default function parseContent(
     }
   }
 
-  $($('*').get().reverse()).each(function (elemIndex, elem) {
+  return $
+}
+
+/**
+ * 处理HTML元素，清理属性和标签
+ */
+function processHtmlElements(
+  $: cheerio.CheerioAPI,
+  allowedAttributes: string[],
+  allowedXhtml11Tags: string[],
+  epubConfigs: IEpubData,
+  index: number | string,
+): void {
+  $($('*').get().reverse()).each(function (elemIndex: number, elem: any) {
     // @ts-ignore
-    let attrs = elem.attribs
+    const attrs = elem.attribs
     // @ts-ignore
-    let that: CheerioElement = this
-    let tags = ['img', 'br', 'hr']
+    const that: any = this
+    const tags = ['img', 'br', 'hr']
+    
     if (tags.includes(that.name)) {
       if (that.name === 'img' && !$(that).attr('alt')) {
         $(that).attr('alt', 'image-placeholder')
@@ -319,15 +358,24 @@ export default function parseContent(
             "tag isn't allowed on EPUB 2/XHTML 1.1 DTD.",
           )
         }
-        let child = $(that).html()
+        const child = $(that).html()
         $(that).replaceWith($('<div>' + child + '</div>'))
       }
     }
   })
+}
 
-  $('img').each((index, elem) => {
-    let url = $(elem).attr('src') || ''
-    let image = epubConfigs.images.find((el) => el.url === url)
+/**
+ * 处理图片元素，更新图片路径并添加到图片列表
+ */
+function processImages(
+  $: cheerio.CheerioAPI,
+  chapter: IChapterData,
+  epubConfigs: IEpubData,
+): void {
+  $('img').each((index: number, elem: any) => {
+    const url = $(elem).attr('src') || ''
+    const image = epubConfigs.images.find((el) => el.url === url)
     let id: string
     let extension: string
 
@@ -336,28 +384,33 @@ export default function parseContent(
       extension = image.extension
     } else {
       id = uuidv4()
-      let mediaType: string = mime.getType(url.replace(/\?.*/, '')) || ''
+      const mediaType: string = mime.getType(url.replace(/\?.*/, '')) || ''
       extension = mime.getExtension(mediaType) || ''
-      let dir = chapter.dir || ''
+      const dir = chapter.dir || ''
 
-      let img: IEpubImage = { id, url, dir, mediaType, extension }
+      const img: IEpubImage = { id, url, dir, mediaType, extension }
       epubConfigs.images.push(img)
     }
 
     $(elem).attr('src', `images/${id}.${extension}`)
   })
+}
 
+/**
+ * 提取并清理HTML内容，处理实体和自闭合标签
+ */
+function extractAndCleanHtmlContent($: cheerio.CheerioAPI): string {
   // Get the processed HTML content without wrapping html/head/body tags
-  // Use xml() with decodeEntities: false to preserve HTML entities
+  let data: string
   if ($('body').length) {
-    chapter.data = $('body').html() || ''
+    data = $('body').html() || ''
   } else {
     // For content without body tag, get the root content
-    chapter.data = $.root().html() || ''
+    data = $.root().html() || ''
   }
   
   // Fix double-encoded entities and decode numeric character references
-  chapter.data = chapter.data
+  return data
     .replace(/&amp;nbsp;/g, '&nbsp;')
     .replace(/&amp;lt;/g, '&lt;')
     .replace(/&amp;gt;/g, '&gt;')
@@ -384,12 +437,43 @@ export default function parseContent(
     .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi, '<$1$2/>')
     // Convert remaining unclosed self-closing tags to XHTML format
     .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2/>')
+}
 
+/**
+ * 递归处理子章节
+ */
+function processChildrenChapters(
+  chapter: IChapterData,
+  index: number | string,
+  epubConfigs: IEpubData,
+): void {
   if (Array.isArray(chapter.children)) {
     chapter.children = chapter.children.map((content, idx) =>
       parseContent(content, `${index}_${idx}`, epubConfigs),
     )
   }
+}
+
+export default function parseContent(
+  content: IChapter,
+  index: number | string,
+  epubConfigs: IEpubData,
+): IChapterData {
+  const chapter = initializeChapterInfo(content, index, epubConfigs)
+  normalizeAuthorInfo(chapter)
+
+  const allowedAttributes = getAllowedAttributes()
+  const allowedXhtml11Tags = getAllowedXhtml11Tags()
+
+  let $ = loadAndProcessHtml(chapter.data)
+
+  processHtmlElements($, allowedAttributes, allowedXhtml11Tags, epubConfigs, index)
+
+  processImages($, chapter, epubConfigs)
+
+  chapter.data = extractAndCleanHtmlContent($)
+
+  processChildrenChapters(chapter, index, epubConfigs)
 
   return chapter
 }
