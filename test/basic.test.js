@@ -20,7 +20,7 @@ describe('Basic', () => {
     async () => {
       let out = { options: {} }
       try {
-        out = await epubGen({ ...data }, 'test.epub')
+        out = await epubGen({ ...data, output: 'test.epub' })
       } catch (e) {
         console.error('Error 24: ' + e.message)
       }

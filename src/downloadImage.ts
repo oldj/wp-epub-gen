@@ -6,29 +6,29 @@
 import fs from 'fs-extra'
 import path from 'path'
 import request from 'superagent'
-import { IEpubData, IEpubImage } from './types'
 import { USER_AGENT } from './libs/utils'
+import { IEpubData, IEpubImage } from './types'
 
 const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<void> => {
-  let { url } = options
-  let { log } = epubData
-  let epub_dir = epubData.dir
+  const { url } = options
+  const { log } = epubData
+  const epub_dir = epubData.dir
 
   if (!url) {
     return
   }
 
-  let image_dir = path.join(epub_dir, 'OEBPS', 'images')
+  const image_dir = path.join(epub_dir, 'OEBPS', 'images')
   fs.ensureDirSync(image_dir)
 
-  let filename = path.join(image_dir, options.id + '.' + options.extension)
+  const filename = path.join(image_dir, options.id + '.' + options.extension)
   if (url.startsWith('file://') || url.startsWith('/')) {
     let aux_path = url.replace(/^file:\/\//i, '')
 
     // 对 URL 编码的路径进行解码（如 %20 转换为空格）
     try {
       aux_path = decodeURIComponent(aux_path)
-    } catch (e) {
+    } catch {
       // 如果解码失败，继续使用原路径
       log(`[URL Decode Warning] Failed to decode path: ${aux_path}`)
     }
@@ -63,7 +63,7 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
     requestAction.pipe(fs.createWriteStream(filename))
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     requestAction.on('error', (err: any) => {
       log('[Download Error] Error while downloading: ' + url)
       log(err)
@@ -80,11 +80,11 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
 }
 
 export const downloadAllImages = async (epubData: IEpubData) => {
-  let { images } = epubData
+  const { images } = epubData
   if (images.length === 0) return
 
   fs.ensureDirSync(path.join(epubData.dir, 'OEBPS', 'images'))
-  for (let image of images) {
+  for (const image of images) {
     await downloadImage(epubData, image)
   }
 }
