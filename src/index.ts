@@ -9,6 +9,7 @@ interface MimeModule {
   getExtension(type: string): string | null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const mimeModule = require('mime/lite') as MimeModule | { default: MimeModule }
 const mime: MimeModule = (mimeModule as any).default || mimeModule
 import os from 'os'
@@ -16,9 +17,10 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { errors } from './errors'
+import { logger } from './logger'
 import parseContent from './parseContent'
 import { render } from './render'
-import { IEpubData, IEpubGenOptions, IOut } from './types'
+import { IEpubData, IEpubGenOptions, IGenConfigs, IOut } from './types'
 
 // 在 ES 模块中获取当前文件和目录路径
 const __filename = fileURLToPath(import.meta.url)
@@ -29,11 +31,11 @@ const baseDir = __dirname
 function result(success: boolean, message?: string, options?: IEpubGenOptions): IOut {
   if (options && options.verbose) {
     if (!success) {
-      console.error(new Error(message))
+      logger.error(new Error(message))
     }
   }
 
-  let out: IOut = {
+  const out: IOut = {
     success,
   }
 
@@ -65,10 +67,10 @@ function check(options: IEpubGenOptions): IOut {
 }
 
 function parseOptions(options: IEpubGenOptions): IEpubData {
-  let tmpDir = options.tmpDir || os.tmpdir()
-  let id = uuidv4()
+  const tmpDir = options.tmpDir || os.tmpdir()
+  const id = uuidv4()
 
-  let data: IEpubData = {
+  const data: IEpubData = {
     description: options.title,
     publisher: 'anonymous',
     author: ['anonymous'],
@@ -91,7 +93,7 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
     docHeader: '',
     images: [],
     content: [],
-    log: (msg) => options.verbose && console.log(msg),
+    log: (msg) => options.verbose && logger.log(msg),
   }
 
   if (data.version === 2) {
@@ -123,37 +125,38 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
   return data
 }
 
-export async function epubGen(options: IEpubGenOptions, output?: string): Promise<IOut> {
-  options = { ...options }
-  if (output) {
-    options.output = output
+export async function epubGen(options: IEpubGenOptions, configs?: IGenConfigs): Promise<IOut> {
+  // 初始化全局 Logger
+  if (configs?.logger) {
+    logger.setLogger(configs.logger)
   }
 
-  let o = check(options)
-  let verbose = options.verbose !== false
+  options = { ...options }
+  const o = check(options)
+  const verbose = options.verbose !== false
   if (!o.success) {
-    if (verbose) console.error(o.message)
+    if (verbose) logger.error(o.message)
     return o
   }
 
   let t: any
   try {
-    let data = parseOptions(options)
-    let timeoutSeconds: number = data.timeoutSeconds || 0
+    const data = parseOptions(options)
+    const timeoutSeconds: number = data.timeoutSeconds || 0
 
     if (timeoutSeconds > 0) {
-      if (verbose) console.log(`TIMEOUT: ${timeoutSeconds}s`)
+      if (verbose) logger.log(`TIMEOUT: ${timeoutSeconds}s`)
       t = setTimeout(() => {
         throw new Error('timeout!')
       }, timeoutSeconds * 1000)
     } else {
-      if (verbose) console.log(`TIMEOUT: N/A`)
+      if (verbose) logger.log(`TIMEOUT: N/A`)
     }
 
     await render(data)
     return result(true, undefined, data)
   } catch (e) {
-    if (verbose) console.error(e)
+    if (verbose) logger.error(e)
     return result(false, e.message, options)
   } finally {
     clearTimeout(t)

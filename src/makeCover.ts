@@ -6,14 +6,14 @@
 import fs from 'fs-extra'
 import path from 'path'
 import request from 'superagent'
-import { IEpubData } from './types'
 import { USER_AGENT } from './libs/utils'
+import { IEpubData } from './types'
 
 export default async function makeCover(data: IEpubData): Promise<void> {
-  let { cover, _coverExtension, log } = data
+  const { cover, _coverExtension, log } = data
   if (!cover) return
 
-  let destPath = path.join(data.dir, 'OEBPS', `cover.${_coverExtension}`)
+  const destPath = path.join(data.dir, 'OEBPS', `cover.${_coverExtension}`)
   let writeStream: any = null
 
   if (cover.startsWith('http')) {

@@ -19,8 +19,8 @@ import {
 import { IChapterData, IEpubData } from './types'
 
 export const generateTempFile = async (epubData: IEpubData) => {
-  let { log } = epubData
-  let oebps_dir = path.join(epubData.dir, 'OEBPS')
+  const { log } = epubData
+  const oebps_dir = path.join(epubData.dir, 'OEBPS')
   await fs.ensureDir(oebps_dir)
 
   // 使用嵌入的模板内容，无需文件路径依赖
@@ -28,10 +28,10 @@ export const generateTempFile = async (epubData: IEpubData) => {
   await writeFile(path.join(oebps_dir, 'style.css'), epubData.css, 'utf-8')
 
   if (epubData.fonts?.length) {
-    let fonts_dir = path.join(oebps_dir, 'fonts')
+    const fonts_dir = path.join(oebps_dir, 'fonts')
     await fs.ensureDir(fonts_dir)
     epubData.fonts = epubData.fonts.map((font) => {
-      let filename = path.basename(font)
+      const filename = path.basename(font)
 
       if (!fs.existsSync(font)) {
         log(`Custom font not found at '${font}'.`)
@@ -49,7 +49,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   }
 
   const saveContentToFile = (content: IChapterData) => {
-    let title = entities.encodeXML(content.title || '')
+    const title = entities.encodeXML(content.title || '')
     let html = `${epubData.docHeader}
 <head>
 <meta charset="UTF-8" />
@@ -83,7 +83,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   epubData.content.map(saveContentToFile)
 
   // write meta-inf/container.xml
-  let metainf_dir = path.join(epubData.dir, 'META-INF')
+  const metainf_dir = path.join(epubData.dir, 'META-INF')
   fs.ensureDirSync(metainf_dir)
   fs.writeFileSync(
     path.join(metainf_dir, 'container.xml'),
@@ -95,7 +95,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   )
 
   if (epubData.version === 2) {
-    let fn = path.join(metainf_dir, 'com.apple.ibooks.display-options.xml')
+    const fn = path.join(metainf_dir, 'com.apple.ibooks.display-options.xml')
     fs.writeFileSync(
       fn,
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -115,6 +115,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   let htmlTocTemplate: string
 
   if (epubData.customOpfTemplatePath && fs.existsSync(epubData.customOpfTemplatePath)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFile } = require('./libs/utils')
     opfTemplate = await readFile(epubData.customOpfTemplatePath, 'utf-8')
   } else {
@@ -122,6 +123,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   }
 
   if (epubData.customNcxTocTemplatePath && fs.existsSync(epubData.customNcxTocTemplatePath)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFile } = require('./libs/utils')
     ncxTocTemplate = await readFile(epubData.customNcxTocTemplatePath, 'utf-8')
   } else {
@@ -129,13 +131,14 @@ export const generateTempFile = async (epubData: IEpubData) => {
   }
 
   if (epubData.customHtmlTocTemplatePath && fs.existsSync(epubData.customHtmlTocTemplatePath)) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { readFile } = require('./libs/utils')
     htmlTocTemplate = await readFile(epubData.customHtmlTocTemplatePath, 'utf-8')
   } else {
     htmlTocTemplate = epubData.version === 2 ? epub2_toc_xhtml_ejs : epub3_toc_xhtml_ejs
   }
 
-  let toc_depth = 1
+  const toc_depth = 1
   fs.writeFileSync(path.join(oebps_dir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8')
   fs.writeFileSync(
     path.join(oebps_dir, 'toc.ncx'),

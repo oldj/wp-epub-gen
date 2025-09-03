@@ -9,6 +9,7 @@ import { remove as removeDiacritics } from 'diacritics'
 import path from 'path'
 import uslug from 'uslug'
 import { v4 as uuidv4 } from 'uuid'
+import { logger } from './logger'
 import { IChapter, IChapterData, IEpubData, IEpubImage } from './types'
 // 改进类型安全：为 mime 模块创建类型声明
 interface MimeModule {
@@ -16,6 +17,7 @@ interface MimeModule {
   getExtension(type: string): string | null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const mimeModule = require('mime/lite') as MimeModule | { default: MimeModule }
 const mime: MimeModule = (mimeModule as any).default || mimeModule
 
@@ -252,7 +254,7 @@ function initializeChapterInfo(
 
   if (!filename) {
     let titleSlug = uslug(removeDiacritics(chapter.title || 'no title'))
-    titleSlug = titleSlug.replace(/[\/\\]/g, '_')
+    titleSlug = titleSlug.replace(/[/\\]/g, '_')
     chapter.href = `${index}_${titleSlug}.xhtml`
     chapter.filePath = path.join(epubConfigs.dir, 'OEBPS', chapter.href)
   } else {
@@ -340,7 +342,9 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
 
     return $
   } catch (error) {
-    throw new Error(`Failed to parse HTML content: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(
+      `Failed to parse HTML content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
   }
 }
 
@@ -358,12 +362,12 @@ function processHtmlElements(
   const allowedAttrsSet = ALLOWED_ATTRIBUTES_SET
   const allowedTagsSet = ALLOWED_XHTML11_TAGS_SET
   const selfClosingTags = SELF_CLOSING_TAGS
-  
+
   $($('*').get().reverse()).each(function (elemIndex: number, elem: any) {
     const attrs = elem.attribs || {}
     const $elem = $(elem)
     const tagName = elem.name
-    
+
     // 处理自闭合标签的特殊属性
     if (selfClosingTags.has(tagName)) {
       if (tagName === 'img' && !$elem.attr('alt')) {
@@ -373,7 +377,7 @@ function processHtmlElements(
 
     // 性能优化：批量处理属性，减少 DOM 操作
     const attrsToRemove: string[] = []
-    for (const [attrName, attrValue] of Object.entries(attrs)) {
+    for (const [attrName] of Object.entries(attrs)) {
       if (allowedAttrsSet.has(attrName)) {
         // 特殊处理 type 属性
         if (attrName === 'type' && tagName !== 'script') {
@@ -383,7 +387,7 @@ function processHtmlElements(
         attrsToRemove.push(attrName)
       }
     }
-    
+
     // 批量移除属性
     for (const attrName of attrsToRemove) {
       $elem.removeAttr(attrName)
@@ -393,8 +397,8 @@ function processHtmlElements(
     if (epubConfigs.version === 2) {
       if (!allowedTagsSet.has(tagName)) {
         if (epubConfigs.verbose) {
-          console.log(
-            `Warning (content[${index}]): ${tagName} tag isn't allowed on EPUB 2/XHTML 1.1 DTD.`
+          logger.warn(
+            `Warning (content[${index}]): ${tagName} tag isn't allowed on EPUB 2/XHTML 1.1 DTD.`,
           )
         }
         const child = $elem.html()
@@ -410,17 +414,13 @@ function processHtmlElements(
  * @param chapter 章节数据
  * @param epubConfigs EPUB配置
  */
-function processImages(
-  $: cheerio.CheerioAPI,
-  chapter: IChapterData,
-  epubConfigs: IEpubData,
-): void {
+function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs: IEpubData): void {
   $('img').each((index: number, elem: any) => {
     const url = $(elem).attr('src') || ''
-    
+
     // 错误处理：检查图片URL是否有效
     if (!url || url.trim().length === 0) {
-      console.warn(`Image at index ${index} in chapter has empty src attribute, removing element`)
+      logger.warn(`Image at index ${index} in chapter has empty src attribute, removing element`)
       $(elem).remove()
       return
     }
@@ -430,10 +430,10 @@ function processImages(
     try {
       // 简单的URL验证
       if (!trimmedUrl.match(/^(https?:\/\/|data:|\.\/|\/)/)) {
-        console.warn(`Image URL "${trimmedUrl}" appears to be invalid, but processing anyway`)
+        logger.warn(`Image URL "${trimmedUrl}" appears to be invalid, but processing anyway`)
       }
     } catch (error) {
-      console.error(`Error validating image URL "${trimmedUrl}":`, error)
+      logger.error(`Error validating image URL "${trimmedUrl}": ${error}`)
     }
 
     const image = epubConfigs.images.find((el) => el.url === trimmedUrl)
@@ -445,42 +445,46 @@ function processImages(
       extension = image.extension
     } else {
       id = uuidv4()
-      
+
       // 错误处理：安全地获取MIME类型和扩展名
       let mediaType: string = ''
       try {
         const cleanUrl = trimmedUrl.replace(/\?.*/, '') // 移除查询参数
         mediaType = mime.getType(cleanUrl) || ''
-        
+
         if (!mediaType) {
           // 尝试从URL扩展名推断
           const urlExtension = cleanUrl.split('.').pop()?.toLowerCase()
           if (urlExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(urlExtension)) {
             mediaType = `image/${urlExtension === 'jpg' ? 'jpeg' : urlExtension}`
-            console.warn(`Could not determine MIME type for "${trimmedUrl}", inferred as "${mediaType}"`)
+            logger.warn(
+              `Could not determine MIME type for "${trimmedUrl}", inferred as "${mediaType}"`,
+            )
           } else {
-            console.warn(`Could not determine MIME type for "${trimmedUrl}", defaulting to image/jpeg`)
+            logger.warn(
+              `Could not determine MIME type for "${trimmedUrl}", defaulting to image/jpeg`,
+            )
             mediaType = 'image/jpeg'
           }
         }
       } catch (error) {
-        console.error(`Error determining MIME type for "${trimmedUrl}":`, error)
+        logger.error(`Error determining MIME type for "${trimmedUrl}": ${error}`)
         mediaType = 'image/jpeg' // 默认值
       }
 
       try {
         extension = mime.getExtension(mediaType) || 'jpg'
       } catch (error) {
-        console.error(`Error getting extension for MIME type "${mediaType}":`, error)
+        logger.error(`Error getting extension for MIME type "${mediaType}": ${error}`)
         extension = 'jpg' // 默认扩展名
       }
 
       const dir = chapter.dir || ''
       const img: IEpubImage = { id, url: trimmedUrl, dir, mediaType, extension }
       epubConfigs.images.push(img)
-      
+
       if (epubConfigs.verbose) {
-        console.log(`Added image: ${trimmedUrl} -> images/${id}.${extension} (${mediaType})`)
+        logger.info(`Added image: ${trimmedUrl} -> images/${id}.${extension} (${mediaType})`)
       }
     }
 
@@ -488,7 +492,7 @@ function processImages(
     try {
       $(elem).attr('src', `images/${id}.${extension}`)
     } catch (error) {
-      console.error(`Error setting src attribute for image ${id}:`, error)
+      logger.error(`Error setting src attribute for image ${id}: ${error}`)
       // 移除有问题的图片元素
       $(elem).remove()
     }
@@ -507,47 +511,56 @@ function extractAndCleanHtmlContent($: cheerio.CheerioAPI, originalData?: string
     // For content without body tag, get the root content
     data = $.root().html() || ''
   }
-  
+
   // 新的实现方式：保持HTML实体原样，不进行任何转换
   // 我们需要从原始数据中提取实体映射，然后在处理后的数据中恢复它们
   if (!originalData) {
-    return data
-      // Convert self-closing tags to XHTML format
-      .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi, '<$1$2/>')
-      // Convert remaining unclosed self-closing tags to XHTML format
-      .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2/>')
+    return (
+      data
+        // Convert self-closing tags to XHTML format
+        .replace(
+          /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi,
+          '<$1$2/>',
+        )
+        // Convert remaining unclosed self-closing tags to XHTML format
+        .replace(
+          /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi,
+          '<$1$2/>',
+        )
+    )
   }
-  
+
   // 创建实体映射，记录原始数据中的所有HTML实体
   const entityMap = new Map<string, string>()
   const entityRegex = /&[a-zA-Z][a-zA-Z0-9]*;|&#[0-9]+;|&#x[0-9a-fA-F]+;/g
-  
+
   // 使用matchAll来避免死循环问题
   const matches = Array.from(originalData.matchAll(entityRegex))
   let processedOriginal = originalData
-  
+
   // 生成唯一的占位符前缀，避免与文档内容冲突
   const timestamp = Date.now()
   const randomId = Math.random().toString(36).substring(2, 8)
   const placeholderPrefix = `__ENTITY_${timestamp}_${randomId}_`
-  
+
   // 从后往前替换，避免索引偏移问题
   for (let i = matches.length - 1; i >= 0; i--) {
     const match = matches[i]
     const placeholder = `${placeholderPrefix}${i}__`
     entityMap.set(placeholder, match[0])
-    
+
     // 替换这个特定位置的实体
-    processedOriginal = processedOriginal.substring(0, match.index!) + 
-                      placeholder + 
-                      processedOriginal.substring(match.index! + match[0].length)
+    processedOriginal =
+      processedOriginal.substring(0, match.index!) +
+      placeholder +
+      processedOriginal.substring(match.index! + match[0].length)
   }
-  
+
   // 使用处理过的原始数据重新加载到Cheerio
   const $temp = cheerio.load(processedOriginal, {
     xmlMode: false,
   })
-  
+
   // 获取处理后的HTML
   let tempData: string
   if ($temp('body').length) {
@@ -555,17 +568,25 @@ function extractAndCleanHtmlContent($: cheerio.CheerioAPI, originalData?: string
   } else {
     tempData = $temp.root().html() || ''
   }
-  
+
   // 恢复实体
   for (const [placeholder, entity] of entityMap) {
     tempData = tempData.replace(new RegExp(placeholder, 'g'), entity)
   }
-  
-  return tempData
-    // Convert self-closing tags to XHTML format
-    .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi, '<$1$2/>')
-    // Convert remaining unclosed self-closing tags to XHTML format
-    .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2/>')
+
+  return (
+    tempData
+      // Convert self-closing tags to XHTML format
+      .replace(
+        /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi,
+        '<$1$2/>',
+      )
+      // Convert remaining unclosed self-closing tags to XHTML format
+      .replace(
+        /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi,
+        '<$1$2/>',
+      )
+  )
 }
 
 /**
@@ -592,9 +613,9 @@ export default function parseContent(
   if (!content) {
     throw new Error('Content cannot be null or undefined')
   }
-  
+
   if (!content.data) {
-    console.warn(`Chapter at index ${index} has no data, using empty string`)
+    logger.warn(`Chapter at index ${index} has no data, using empty string`)
     content.data = ''
   }
 
@@ -606,14 +627,14 @@ export default function parseContent(
 
   // 错误处理：如果章节数据为空，直接返回空内容
   if (!chapter.data || chapter.data.trim().length === 0) {
-    console.warn(`Chapter at index ${index} has empty data, setting empty content`)
+    logger.warn(`Chapter at index ${index} has empty data, setting empty content`)
     chapter.data = ''
   } else {
     let $: cheerio.CheerioAPI
     try {
       $ = loadAndProcessHtml(chapter.data)
     } catch (error) {
-      console.error(`Failed to process HTML for chapter ${index}:`, error)
+      logger.error(`Failed to process HTML for chapter ${index}: ${error}`)
       // 降级处理：创建包含原始文本的简单结构
       $ = cheerio.load(`<div>${chapter.data}</div>`)
     }

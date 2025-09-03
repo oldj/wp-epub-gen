@@ -13,7 +13,7 @@ describe('Child page image', () => {
     async () => {
       let out = { options: {} }
       try {
-        out = await epubGen({ ...data }, 'cpi.epub')
+        out = await epubGen({ ...data, output: 'cpi.epub' })
       } catch (e) {
         console.error('Error 24: ' + e.message)
       }

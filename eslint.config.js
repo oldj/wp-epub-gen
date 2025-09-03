@@ -1,7 +1,7 @@
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 
-export default tseslint.config(
+export default tseslint.createConfig(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -9,30 +9,25 @@ export default tseslint.config(
       parser: tseslint.parser,
       parserOptions: {
         project: './tsconfig.json',
-        sourceType: 'module'
+        sourceType: 'module',
       },
       globals: {
         node: true,
-        jest: true
-      }
+        jest: true,
+      },
     },
     rules: {
       '@typescript-eslint/interface-name-prefix': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
-    ignores: [
-      'build/**',
-      'node_modules/**',
-      '*.js',
-      '*.mjs'
-    ]
+    ignores: ['build/**', 'node_modules/**', '*.js', '*.mjs'],
   },
   {
     files: ['**/*.test.ts', '**/*.spec.ts'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off'
-    }
-  }
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 )

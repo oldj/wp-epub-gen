@@ -132,7 +132,7 @@ describe('parseContent', () => {
     // 检查混合内容处理
     expect(result.data).toContain('<h1>')
     expect(result.data).toContain('<blockquote>')
-    
+
     // 检查HTML实体原样保持
     expect(result.data).toContain('&nbsp;')
     expect(result.data).toContain('&quot;')
@@ -191,7 +191,7 @@ describe('parseContent', () => {
     const result = parseContent(inputChapter, 0, mockEpubConfigs)
 
     // 检查输出只包含body内容，不包含html、head、body标签
-    expect(result.data).not.toMatch(/<\!DOCTYPE[^>]*>/)
+    expect(result.data).not.toMatch(/<![^>]*>/)
     expect(result.data).not.toMatch(/<html[^>]*>/)
     expect(result.data).not.toContain('</html>')
     expect(result.data).not.toMatch(/<head[^>]*>/)
@@ -299,14 +299,14 @@ describe('parseContent', () => {
     expect(result.data).toContain('&lt;')
     expect(result.data).toContain('&gt;')
     expect(result.data).toContain('&quot;')
-    
+
     // 检查内容完整性
     expect(result.data).toContain('这是包含&amp;nbsp;的段落')
     expect(result.data).toContain('普通空格和&amp;nbsp;编码空格')
     expect(result.data).toContain('多个&amp;nbsp;&amp;nbsp;&amp;nbsp;连续编码空格')
     expect(result.data).toContain('行内元素&amp;nbsp;测试')
     expect(result.data).toContain('其他实体：&lt;标签&gt;和&quot;引号&quot;')
-    
+
     // 确保没有三重编码
     expect(result.data).not.toContain('&amp;amp;nbsp;')
     expect(result.data).not.toContain('&amp;lt;')
@@ -335,10 +335,10 @@ describe('parseContent', () => {
     expect(result.data).toContain('&#x00A0;')
     expect(result.data).toContain('&#x201C;')
     expect(result.data).toContain('&#x201D;')
-    
+
     // 检查命名实体也保持原样
     expect(result.data).toContain('&nbsp;')
-    
+
     // 检查内容完整性
     expect(result.data).toContain('十进制实体：&#160;空格和&#8220;左引号&#8221;')
     expect(result.data).toContain('十六进制实体：&#x00A0;空格和&#x201C;左引号&#x201D;')

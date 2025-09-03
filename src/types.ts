@@ -76,3 +76,14 @@ export interface IOut {
   message?: string
   options?: IEpubGenOptions
 }
+
+export interface ILogger {
+  log: (msg: any) => void
+  info: (msg: any) => void
+  error: (msg: any) => void
+  warn: (msg: any) => void
+}
+
+export interface IGenConfigs {
+  logger?: ILogger
+}
