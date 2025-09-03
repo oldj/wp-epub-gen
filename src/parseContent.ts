@@ -347,7 +347,43 @@ export default function parseContent(
     $(elem).attr('src', `images/${id}.${extension}`)
   })
 
-  chapter.data = $.xml()
+  // Get the processed HTML content without wrapping html/head/body tags
+  // Use xml() with decodeEntities: false to preserve HTML entities
+  if ($('body').length) {
+    chapter.data = $('body').html() || ''
+  } else {
+    // For content without body tag, get the root content
+    chapter.data = $.root().html() || ''
+  }
+  
+  // Fix double-encoded entities and decode numeric character references
+  chapter.data = chapter.data
+    .replace(/&amp;nbsp;/g, '&nbsp;')
+    .replace(/&amp;lt;/g, '&lt;')
+    .replace(/&amp;gt;/g, '&gt;')
+    .replace(/&amp;quot;/g, '&quot;')
+    .replace(/&amp;apos;/g, '&apos;')
+    // Handle cases where & was double-encoded but we want to preserve &amp;
+    .replace(/&amp;amp;/g, '&amp;')
+    // Decode numeric character references back to Unicode characters
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+      try {
+        return String.fromCharCode(parseInt(hex, 16))
+      } catch {
+        return match
+      }
+    })
+    .replace(/&#(\d+);/g, (match, dec) => {
+      try {
+        return String.fromCharCode(parseInt(dec, 10))
+      } catch {
+        return match
+      }
+    })
+    // Convert self-closing tags to XHTML format
+    .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi, '<$1$2/>')
+    // Convert remaining unclosed self-closing tags to XHTML format
+    .replace(/<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi, '<$1$2/>')
 
   if (Array.isArray(chapter.children)) {
     chapter.children = chapter.children.map((content, idx) =>
