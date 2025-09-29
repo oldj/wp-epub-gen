@@ -1,4 +1,6 @@
 .idea
+.codebuddy
+
 node_modules
 *.js.map
 

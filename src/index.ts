@@ -130,6 +130,7 @@ export async function epubGen(options: IEpubGenOptions, configs?: IGenConfigs): 
   if (configs?.logger) {
     logger.setLogger(configs.logger)
   }
+  logger.info('EpubGen started 101...')
 
   options = { ...options }
   const o = check(options)
@@ -170,7 +171,7 @@ export { errors } from './errors'
 export default {
   epubGen,
   gen,
-  errors
+  errors,
 }
 
 export type { IChapter, IChapterData, IEpubData, IEpubGenOptions, IEpubImage, IOut } from './types'
