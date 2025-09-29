@@ -321,10 +321,12 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
 
   try {
     let $ = cheerio.load(trimmedData, {
-      xml: {
-        lowerCaseTags: true,
-        recognizeSelfClosing: true,
-      },
+      xmlMode: true,
+      // @ts-ignore
+      decodeEntities: false,
+      lowerCaseTags: true,
+      recognizeSelfClosing: true,
+      lowerCaseAttributeNames: true,
     })
 
     // only body innerHTML is allowed
@@ -333,10 +335,12 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
       const html = body.html()
       if (html) {
         $ = cheerio.load(html, {
-          xml: {
-            lowerCaseTags: true,
-            recognizeSelfClosing: true,
-          },
+          xmlMode: true,
+          // @ts-ignore
+          decodeEntities: false,
+          lowerCaseTags: true,
+          recognizeSelfClosing: true,
+          lowerCaseAttributeNames: true,
         })
       }
     }
@@ -512,8 +516,6 @@ function extractAndCleanHtmlContent($: cheerio.CheerioAPI): string {
     // For content without body tag, get the root content
     data = $.root().html() || ''
   }
-  console.log('data')
-  console.log(data)
 
   return (
     data
@@ -527,6 +529,8 @@ function extractAndCleanHtmlContent($: cheerio.CheerioAPI): string {
         /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi,
         '<$1$2/>',
       )
+      // Remove any stray closing </img> tags which are invalid in XHTML
+      .replace(/<\/img\s*>/gi, '')
   )
 }
 
