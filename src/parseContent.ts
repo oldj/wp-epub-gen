@@ -11,6 +11,7 @@ import uslug from 'uslug'
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from './logger'
 import { IChapter, IChapterData, IEpubData, IEpubImage } from './types'
+
 // 改进类型安全：为 mime 模块创建类型声明
 interface MimeModule {
   getType(path: string): string | null
@@ -429,7 +430,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
     const trimmedUrl = url.trim()
     try {
       // 简单的URL验证
-      if (!trimmedUrl.match(/^(https?:\/\/|data:|\.\/|\/)/)) {
+      if (!trimmedUrl.match(/^(https?:\/\/|file:\/\/|data:|\.\/|\/)/)) {
         logger.warn(`Image URL "${trimmedUrl}" appears to be invalid, but processing anyway`)
       }
     } catch (error) {
@@ -502,7 +503,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
 /**
  * 提取并清理HTML内容，处理实体和自闭合标签
  */
-function extractAndCleanHtmlContent($: cheerio.CheerioAPI, originalData?: string): string {
+function extractAndCleanHtmlContent($: cheerio.CheerioAPI): string {
   // Get the processed HTML content without wrapping html/head/body tags
   let data: string
   if ($('body').length) {
@@ -511,71 +512,11 @@ function extractAndCleanHtmlContent($: cheerio.CheerioAPI, originalData?: string
     // For content without body tag, get the root content
     data = $.root().html() || ''
   }
-
-  // 新的实现方式：保持HTML实体原样，不进行任何转换
-  // 我们需要从原始数据中提取实体映射，然后在处理后的数据中恢复它们
-  if (!originalData) {
-    return (
-      data
-        // Convert self-closing tags to XHTML format
-        .replace(
-          /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi,
-          '<$1$2/>',
-        )
-        // Convert remaining unclosed self-closing tags to XHTML format
-        .replace(
-          /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi,
-          '<$1$2/>',
-        )
-    )
-  }
-
-  // 创建实体映射，记录原始数据中的所有HTML实体
-  const entityMap = new Map<string, string>()
-  const entityRegex = /&[a-zA-Z][a-zA-Z0-9]*;|&#[0-9]+;|&#x[0-9a-fA-F]+;/g
-
-  // 使用matchAll来避免死循环问题
-  const matches = Array.from(originalData.matchAll(entityRegex))
-  let processedOriginal = originalData
-
-  // 生成唯一的占位符前缀，避免与文档内容冲突
-  const timestamp = Date.now()
-  const randomId = Math.random().toString(36).substring(2, 8)
-  const placeholderPrefix = `__ENTITY_${timestamp}_${randomId}_`
-
-  // 从后往前替换，避免索引偏移问题
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const match = matches[i]
-    const placeholder = `${placeholderPrefix}${i}__`
-    entityMap.set(placeholder, match[0])
-
-    // 替换这个特定位置的实体
-    processedOriginal =
-      processedOriginal.substring(0, match.index!) +
-      placeholder +
-      processedOriginal.substring(match.index! + match[0].length)
-  }
-
-  // 使用处理过的原始数据重新加载到Cheerio
-  const $temp = cheerio.load(processedOriginal, {
-    xmlMode: false,
-  })
-
-  // 获取处理后的HTML
-  let tempData: string
-  if ($temp('body').length) {
-    tempData = $temp('body').html() || ''
-  } else {
-    tempData = $temp.root().html() || ''
-  }
-
-  // 恢复实体
-  for (const [placeholder, entity] of entityMap) {
-    tempData = tempData.replace(new RegExp(placeholder, 'g'), entity)
-  }
+  console.log('data')
+  console.log(data)
 
   return (
-    tempData
+    data
       // Convert self-closing tags to XHTML format
       .replace(
         /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi,
@@ -640,10 +581,9 @@ export default function parseContent(
     }
 
     processHtmlElements($, allowedAttributes, allowedXhtml11Tags, epubConfigs, index)
-
     processImages($, chapter, epubConfigs)
 
-    chapter.data = extractAndCleanHtmlContent($, content.data)
+    chapter.data = extractAndCleanHtmlContent($)
   }
 
   processChildrenChapters(chapter, index, epubConfigs)
