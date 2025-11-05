@@ -99,12 +99,12 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
   if (data.version === 2) {
     data.docHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="#{self.options.lang}">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${data.lang}" lang="${data.lang}">
 `
   } else {
     data.docHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="#{self.options.lang}">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${data.lang}" lang="${data.lang}">
 `
   }
 
