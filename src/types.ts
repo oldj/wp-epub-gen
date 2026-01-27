@@ -19,6 +19,7 @@ export interface IEpubGenOptions {
   output: string
   version?: 2 | 3
   css?: string
+  noDefaultCss?: boolean // 是否禁用默认的 CSS 样式表，默认为 false，即会添加默认的 CSS 样式表
   fonts?: string[]
   lang?: 'en'
   tocTitle?: string
