@@ -20,15 +20,24 @@ import { IChapterData, IEpubData } from './types'
 
 export const generateTempFile = async (epubData: IEpubData) => {
   const { log } = epubData
-  const oebps_dir = path.join(epubData.dir, 'OEBPS')
-  await fs.ensureDir(oebps_dir)
+  const oebpsDir = path.join(epubData.dir, 'OEBPS')
+  await fs.ensureDir(oebpsDir)
 
   // 使用嵌入的模板内容，无需文件路径依赖
-  epubData.css = epubData.css || template_css
-  await writeFile(path.join(oebps_dir, 'style.css'), epubData.css, 'utf-8')
+  const customCss = epubData.css || ''
+  if (!epubData.noDefaultCss) {
+    // 添加默认样式
+    epubData.css = template_css
+    if (customCss) {
+      epubData.css += '\n\n' + customCss
+    }
+  } else {
+    epubData.css = customCss
+  }
+  await writeFile(path.join(oebpsDir, 'style.css'), epubData.css, 'utf-8')
 
   if (epubData.fonts?.length) {
-    const fonts_dir = path.join(oebps_dir, 'fonts')
+    const fonts_dir = path.join(oebpsDir, 'fonts')
     await fs.ensureDir(fonts_dir)
     epubData.fonts = epubData.fonts.map((font) => {
       const filename = path.basename(font)
@@ -139,15 +148,15 @@ export const generateTempFile = async (epubData: IEpubData) => {
   }
 
   const toc_depth = 1
-  fs.writeFileSync(path.join(oebps_dir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8')
+  fs.writeFileSync(path.join(oebpsDir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8')
   fs.writeFileSync(
-    path.join(oebps_dir, 'toc.ncx'),
+    path.join(oebpsDir, 'toc.ncx'),
     ejs.render(ncxTocTemplate, { ...epubData, toc_depth }),
     'utf-8',
   )
   // 说明：toc.xhtml 的内容在 macOS 自带的 Books 会被当作目录显示，如果空格太多，目录显示可能会不正常，因此这儿简单去掉了不必要的空格
   fs.writeFileSync(
-    path.join(oebps_dir, 'toc.xhtml'),
+    path.join(oebpsDir, 'toc.xhtml'),
     simpleMinifier(ejs.render(htmlTocTemplate, epubData)),
     'utf-8',
   )

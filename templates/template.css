@@ -1,46 +1,125 @@
-.epub-author {
-  color: #555;
+/* =========================
+   EPUB 3 Base Stylesheet
+   ========================= */
+
+/* 全局基础设置 */
+html {
+  font-size: 100%;
 }
 
-.epub-link {
-  margin-bottom: 30px;
-}
-
-.epub-link a {
-  color: #666;
-  font-size: 90%;
-}
-
-.toc-author {
-  font-size: 90%;
-  color: #555;
-}
-
-.toc-link {
-  color: #999;
-  font-size: 85%;
-  display: block;
-}
-
-hr {
-  border: 0;
-  border-bottom: 1px solid #dedede;
-  margin: 60px 10%;
-}
-
-.TOC > ol {
+body {
   margin: 0;
   padding: 0;
+  line-height: 1.6;
+  font-family: serif;
+  color: #000;
+  background-color: transparent;
 }
 
-.TOC > ol ol {
+/* 段落 */
+p {
+  margin: 0;
   padding: 0;
-  margin-left: 2em;
+  /*text-indent: 2em;*/
+  orphans: 2;
+  widows: 2;
 }
 
-.TOC li {
-  font-size: 16px;
-  list-style: none;
-  margin: 0 auto;
+/* 标题 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: bold;
+  line-height: 1.3;
+  margin: 1.2em 0 0.6em 0;
+  text-indent: 0;
+  page-break-after: avoid;
+}
+
+h1 {
+  font-size: 1.6em;
+}
+
+h2 {
+  font-size: 1.4em;
+}
+
+h3 {
+  font-size: 1.2em;
+}
+
+/* 章节标题常用居中 */
+.chapter-title {
+  text-align: center;
+  margin-top: 2em;
+  margin-bottom: 1.5em;
+}
+
+/* 首段不缩进（常用于章节开头） */
+.no-indent {
+  text-indent: 0;
+}
+
+/* 强调 */
+em {
+  font-style: italic;
+}
+
+strong {
+  font-weight: bold;
+}
+
+/* 引用 */
+blockquote {
+  margin: 1em 1.5em;
   padding: 0;
+}
+
+/* 分隔符（如 ***） */
+hr {
+  border: none;
+  text-align: center;
+  margin: 1.5em 0;
+}
+
+/* 图片 */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 图片居中 */
+.figure {
+  text-align: center;
+  margin: 1em 0;
+}
+
+/* 列表 */
+ul,
+ol {
+  margin: 1em 0 1em 1.5em;
+  padding: 0;
+}
+
+li {
+  margin: 0.3em 0;
+}
+
+/* 表格（谨慎使用） */
+table {
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+td,
+th {
+  padding: 0.3em 0.5em;
+}
+
+/* 分页控制（EPUB 安全用法） */
+.page-break {
+  page-break-before: always;
 }
