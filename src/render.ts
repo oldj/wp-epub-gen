@@ -8,7 +8,7 @@ import fs from 'fs-extra'
 import path from 'path'
 import { downloadAllImages } from './downloadImage'
 import { generateTempFile } from './generateTempFile'
-import { fileIsStable } from './libs/utils'
+import { emitProgress, fileIsStable } from './libs/utils'
 import makeCover from './makeCover'
 import { IEpubData } from './types'
 
@@ -37,6 +37,7 @@ async function genEpub(epubData: IEpubData): Promise<void> {
   const archive = archiver('zip', { zlib: { level: 9 } })
   const outputStream = fs.createWriteStream(epubData.output)
   log('Zipping temp dir to ' + output)
+  emitProgress(epubData._configs, { phase: 'zip', current: 0, total: 1 })
 
   return new Promise((resolve, reject) => {
     archive.on('end', async () => {
@@ -53,6 +54,7 @@ async function genEpub(epubData: IEpubData): Promise<void> {
 
       try {
         fs.removeSync(dir)
+        emitProgress(epubData._configs, { phase: 'zip', current: 1, total: 1 })
         resolve()
       } catch (e) {
         log('[Error] ' + e.message)

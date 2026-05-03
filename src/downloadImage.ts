@@ -6,7 +6,7 @@
 import fs from 'fs-extra'
 import path from 'path'
 import request from 'superagent'
-import { USER_AGENT } from './libs/utils'
+import { emitProgress, pLimit, USER_AGENT } from './libs/utils'
 import { IEpubData, IEpubImage } from './types'
 
 const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<void> => {
@@ -18,9 +18,8 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
     return
   }
 
+  // image_dir 已由 downloadAllImages 在外层 ensureDir
   const image_dir = path.join(epub_dir, 'OEBPS', 'images')
-  fs.ensureDirSync(image_dir)
-
   const filename = path.join(image_dir, options.id + '.' + options.extension)
   if (url.startsWith('file://') || url.startsWith('/')) {
     let aux_path = url.replace(/^file:\/\//i, '')
@@ -53,28 +52,57 @@ const downloadImage = async (epubData: IEpubData, options: IEpubImage): Promise<
     return
   }
 
+  const writeStream = fs.createWriteStream(filename)
   let requestAction: any
   if (url.startsWith('http')) {
     requestAction = request.get(url).set({ 'User-Agent': USER_AGENT })
-    requestAction.pipe(fs.createWriteStream(filename))
   } else {
     log(`[Copy 2] '${url}' to '${filename}'`)
     requestAction = fs.createReadStream(path.join(options.dir || '', url))
-    requestAction.pipe(fs.createWriteStream(filename))
   }
+  requestAction.pipe(writeStream)
 
-  return new Promise((resolve, _reject) => {
+  return new Promise((resolve) => {
+    let settled = false
+    const finalize = () => {
+      if (settled) return
+      settled = true
+      resolve()
+    }
+    const cleanupFile = () => {
+      try {
+        fs.unlinkSync(filename)
+      } catch {
+        // ignore: 文件可能已不存在或没权限
+      }
+    }
+
+    const abortSource = () => {
+      // superagent 用 abort()；fs.createReadStream 用 destroy()
+      if (typeof requestAction.abort === 'function') requestAction.abort()
+      else if (typeof requestAction.destroy === 'function') requestAction.destroy()
+    }
+
     requestAction.on('error', (err: any) => {
       log('[Download Error] Error while downloading: ' + url)
       log(err)
-      fs.unlinkSync(filename)
-      // reject(err)
-      resolve()
+      writeStream.destroy()
+      cleanupFile()
+      finalize()
     })
 
-    requestAction.on('end', () => {
+    writeStream.on('error', (err: any) => {
+      log('[Write Error] Error while writing: ' + filename)
+      log(err)
+      abortSource()
+      cleanupFile()
+      finalize()
+    })
+
+    // 'finish' 表示目标流的所有数据已 flush 完成，比 source 'end' 更可靠
+    writeStream.on('finish', () => {
       log('[Download Success] ' + url)
-      resolve()
+      finalize()
     })
   })
 }
@@ -83,8 +111,26 @@ export const downloadAllImages = async (epubData: IEpubData) => {
   const { images } = epubData
   if (images.length === 0) return
 
-  fs.ensureDirSync(path.join(epubData.dir, 'OEBPS', 'images'))
-  for (const image of images) {
-    await downloadImage(epubData, image)
-  }
+  await fs.ensureDir(path.join(epubData.dir, 'OEBPS', 'images'))
+
+  const concurrency = epubData._configs?.concurrency ?? 16
+  const limit = pLimit<void>(concurrency)
+  const total = images.length
+  let done = 0
+
+  emitProgress(epubData._configs, { phase: 'downloadImage', current: 0, total })
+  await Promise.all(
+    images.map((image) =>
+      limit(async () => {
+        await downloadImage(epubData, image)
+        done++
+        emitProgress(epubData._configs, {
+          phase: 'downloadImage',
+          current: done,
+          total,
+          label: image.url,
+        })
+      }),
+    ),
+  )
 }

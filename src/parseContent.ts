@@ -320,7 +320,7 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
   }
 
   try {
-    let $ = cheerio.load(trimmedData, {
+    const $ = cheerio.load(trimmedData, {
       xmlMode: true,
       // @ts-ignore
       decodeEntities: false,
@@ -329,20 +329,11 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
       lowerCaseAttributeNames: true,
     })
 
-    // only body innerHTML is allowed
+    // only body innerHTML is allowed —— 把 body 子节点提升到 root，避免二次 cheerio.load
     const body = $('body')
     if (body.length) {
-      const html = body.html()
-      if (html) {
-        $ = cheerio.load(html, {
-          xmlMode: true,
-          // @ts-ignore
-          decodeEntities: false,
-          lowerCaseTags: true,
-          recognizeSelfClosing: true,
-          lowerCaseAttributeNames: true,
-        })
-      }
+      const bodyContents = body.contents()
+      $.root().empty().append(bodyContents)
     }
 
     return $
@@ -420,6 +411,12 @@ function processHtmlElements(
  * @param epubConfigs EPUB配置
  */
 function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs: IEpubData): void {
+  // 懒构建 url -> image 索引，避免每张图都做 O(M) 线性 find
+  if (!epubConfigs._imagesByUrl) {
+    epubConfigs._imagesByUrl = new Map(epubConfigs.images.map((img) => [img.url, img]))
+  }
+  const imagesByUrl = epubConfigs._imagesByUrl
+
   $('img').each((index: number, elem: any) => {
     const url = $(elem).attr('src') || ''
 
@@ -441,7 +438,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
       logger.error(`Error validating image URL "${trimmedUrl}": ${error}`)
     }
 
-    const image = epubConfigs.images.find((el) => el.url === trimmedUrl)
+    const image = imagesByUrl.get(trimmedUrl)
     let id: string
     let extension: string
 
@@ -487,6 +484,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
       const dir = chapter.dir || ''
       const img: IEpubImage = { id, url: trimmedUrl, dir, mediaType, extension }
       epubConfigs.images.push(img)
+      imagesByUrl.set(trimmedUrl, img)
 
       if (epubConfigs.verbose) {
         logger.info(`Added image: ${trimmedUrl} -> images/${id}.${extension} (${mediaType})`)

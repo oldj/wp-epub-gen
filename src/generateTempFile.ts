@@ -7,7 +7,7 @@ import ejs from 'ejs'
 import * as entities from 'entities'
 import fs from 'fs-extra'
 import path from 'path'
-import { simpleMinifier, writeFile } from './libs/utils'
+import { emitProgress, pLimit, simpleMinifier, writeFile } from './libs/utils'
 import {
   epub2_content_opf_ejs,
   epub2_toc_xhtml_ejs,
@@ -39,17 +39,17 @@ export const generateTempFile = async (epubData: IEpubData) => {
   if (epubData.fonts?.length) {
     const fonts_dir = path.join(oebpsDir, 'fonts')
     await fs.ensureDir(fonts_dir)
-    epubData.fonts = epubData.fonts.map((font) => {
+    const fontFilenames: string[] = []
+    for (const font of epubData.fonts) {
       const filename = path.basename(font)
-
       if (!fs.existsSync(font)) {
         log(`Custom font not found at '${font}'.`)
       } else {
-        fs.copySync(font, path.join(fonts_dir, filename))
+        await fs.copy(font, path.join(fonts_dir, filename))
       }
-
-      return filename
-    })
+      fontFilenames.push(filename)
+    }
+    epubData.fonts = fontFilenames
   }
 
   const isAppendTitle = (global_append?: boolean, local_append?: boolean): boolean => {
@@ -57,7 +57,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
     return !!global_append
   }
 
-  const saveContentToFile = (content: IChapterData) => {
+  const renderChapterHtml = (content: IChapterData): string => {
     const title = entities.encodeXML(content.title || '')
     let html = `${epubData.docHeader}
 <head>
@@ -80,21 +80,50 @@ export const generateTempFile = async (epubData: IEpubData) => {
         : ''
     html += `${content.data}`
     html += '\n</body>\n</html>'
-
-    fs.ensureDirSync(path.dirname(content.filePath))
-    fs.writeFileSync(content.filePath, html, 'utf-8')
-
-    if (Array.isArray(content.children)) {
-      content.children.map(saveContentToFile)
-    }
+    return html
   }
 
-  epubData.content.map(saveContentToFile)
+  const flattenChapters = (
+    nodes: IChapterData[],
+    out: IChapterData[] = [],
+  ): IChapterData[] => {
+    for (const c of nodes) {
+      out.push(c)
+      if (Array.isArray(c.children) && c.children.length) flattenChapters(c.children, out)
+    }
+    return out
+  }
+
+  const allChapters = flattenChapters(epubData.content)
+  const totalChapters = allChapters.length
+
+  // Phase 1: 单次 ensureDir 唯一目录（消除每章一次的重复调用）
+  const uniqueDirs = Array.from(new Set(allChapters.map((c) => path.dirname(c.filePath))))
+  for (const d of uniqueDirs) await fs.ensureDir(d)
+
+  // Phase 2: 并发写章节文件
+  const concurrency = epubData._configs?.concurrency ?? 16
+  const limit = pLimit<void>(concurrency)
+  let written = 0
+  await Promise.all(
+    allChapters.map((content) =>
+      limit(async () => {
+        await fs.writeFile(content.filePath, renderChapterHtml(content), 'utf-8')
+        written++
+        emitProgress(epubData._configs, {
+          phase: 'writeChapters',
+          current: written,
+          total: totalChapters,
+          label: content.title,
+        })
+      }),
+    ),
+  )
 
   // write meta-inf/container.xml
   const metainf_dir = path.join(epubData.dir, 'META-INF')
-  fs.ensureDirSync(metainf_dir)
-  fs.writeFileSync(
+  await fs.ensureDir(metainf_dir)
+  await fs.writeFile(
     path.join(metainf_dir, 'container.xml'),
     `<?xml version="1.0" encoding="UTF-8" ?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -105,7 +134,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
 
   if (epubData.version === 2) {
     const fn = path.join(metainf_dir, 'com.apple.ibooks.display-options.xml')
-    fs.writeFileSync(
+    await fs.writeFile(
       fn,
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <display_options>
@@ -148,16 +177,24 @@ export const generateTempFile = async (epubData: IEpubData) => {
   }
 
   const toc_depth = 1
-  fs.writeFileSync(path.join(oebpsDir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8')
-  fs.writeFileSync(
-    path.join(oebpsDir, 'toc.ncx'),
-    ejs.render(ncxTocTemplate, { ...epubData, toc_depth }),
-    'utf-8',
-  )
+  emitProgress(epubData._configs, { phase: 'buildToc', current: 0, total: 3 })
   // 说明：toc.xhtml 的内容在 macOS 自带的 Books 会被当作目录显示，如果空格太多，目录显示可能会不正常，因此这儿简单去掉了不必要的空格
-  fs.writeFileSync(
-    path.join(oebpsDir, 'toc.xhtml'),
-    simpleMinifier(ejs.render(htmlTocTemplate, epubData)),
-    'utf-8',
-  )
+  await Promise.all([
+    fs.writeFile(
+      path.join(oebpsDir, 'content.opf'),
+      ejs.render(opfTemplate, epubData),
+      'utf-8',
+    ),
+    fs.writeFile(
+      path.join(oebpsDir, 'toc.ncx'),
+      ejs.render(ncxTocTemplate, { ...epubData, toc_depth }),
+      'utf-8',
+    ),
+    fs.writeFile(
+      path.join(oebpsDir, 'toc.xhtml'),
+      simpleMinifier(ejs.render(htmlTocTemplate, epubData)),
+      'utf-8',
+    ),
+  ])
+  emitProgress(epubData._configs, { phase: 'buildToc', current: 3, total: 3 })
 }
