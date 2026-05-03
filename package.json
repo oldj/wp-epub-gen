@@ -1,6 +1,6 @@
 {
   "name": "wp-epub-gen",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Epub generator.",
   "type": "module",
   "main": "build/index.cjs",
