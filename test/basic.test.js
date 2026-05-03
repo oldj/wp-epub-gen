@@ -3,9 +3,8 @@
  * @homepage: https://oldj.net
  */
 
-import { describe, it, expect } from 'vitest'
-import { epubGen } from '../build/index'
-import { errors } from '../build/index'
+import { describe, expect, it } from 'vitest'
+import { epubGen, errors } from '../src/index'
 import * as data from './data/1.json'
 
 describe('Basic', () => {

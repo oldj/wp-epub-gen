@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { epubGen } from '../build/index'
+import { epubGen } from '../src/index'
 import * as data from './data/1.json'
 
 describe('Child page image', () => {
