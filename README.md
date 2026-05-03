@@ -122,13 +122,13 @@ epubGen(options).then(result => {
 
 ## API 参考
 
-### epubGen(options, output?)
+### epubGen(options, configs?)
 
 主要的 EPUB 生成函数。
 
 **参数：**
-- `options: IEpubGenOptions` - 配置选项对象
-- `output?: string` - 可选的输出路径，会覆盖 options.output
+- `options: IEpubGenOptions` - 配置选项对象（标题、作者、封面、章节内容等）
+- `configs?: IGenConfigs` - 可选的运行时回调（logger、onProgress、concurrency），见下文 [IGenConfigs](#igenconfigs-运行时回调)
 
 **返回值：**
 - `Promise<IOut>` - 包含生成结果的 Promise
@@ -233,18 +233,83 @@ interface IOut {
 }
 ```
 
+### IGenConfigs 运行时回调
+
+`epubGen` 的第二个参数，用于注入宿主侧的回调和并发配置。所有字段都是可选的。
+
+```typescript
+interface IGenConfigs {
+  logger?: ILogger;
+  onProgress?: (e: IProgressEvent) => void;
+  concurrency?: number;
+}
+```
+
+#### `logger?: ILogger`
+
+注入自定义日志记录器（替代默认 `console`）。常用于 Electron 主进程把日志转发到渲染进程。
+
+```typescript
+interface ILogger {
+  log: (msg: any) => void;
+  info: (msg: any) => void;
+  warn: (msg: any) => void;
+  error: (msg: any) => void;
+}
+```
+
+#### `onProgress?: (e: IProgressEvent) => void`
+
+进度回调。生成过程会在 5 个阶段中分别推送事件，宿主可据此渲染进度条或转发 IPC 给 UI。
+
+```typescript
+type ProgressPhase =
+  | 'parseContent'    // 解析章节 HTML
+  | 'writeChapters'   // 写章节临时文件
+  | 'buildToc'        // 渲染 OPF / NCX / TOC
+  | 'downloadImage'   // 下载图片（仅当存在图片时）
+  | 'zip'             // 打包 .epub
+
+interface IProgressEvent {
+  phase: ProgressPhase;
+  current: number;     // 已完成数量
+  total: number;       // 总数量
+  label?: string;      // 当前条目标签（章节标题 / 图片 URL）
+}
+```
+
+最小用法：
+
+```typescript
+await epubGen(options, {
+  onProgress: (e) => {
+    console.log(`[${e.phase}] ${e.current}/${e.total}`);
+  },
+});
+```
+
+回调中抛出的异常会被库静默吞掉，不会中断 EPUB 生成。
+
+#### `concurrency?: number`
+
+写章节文件和下载图片所共用的并发上限。默认 `16`，机械硬盘或带宽受限场景可调小（如 `4`）。非有限正整数（NaN、负数等）会被自动归一化为默认值。
+
 ## 导出的类型
 
 库导出了所有 TypeScript 类型定义：
 
 ```typescript
-import type { 
-  IEpubGenOptions, 
-  IChapter, 
+import type {
+  IEpubGenOptions,
+  IChapter,
   IChapterData,
   IEpubData,
   IEpubImage,
-  IOut 
+  IGenConfigs,
+  ILogger,
+  IProgressEvent,
+  ProgressPhase,
+  IOut,
 } from 'wp-epub-gen';
 ```
 

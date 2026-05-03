@@ -18,9 +18,10 @@ import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { errors } from './errors'
 import { logger } from './logger'
+import { emitProgress, normalizeConcurrency } from './libs/utils'
 import parseContent from './parseContent'
 import { render } from './render'
-import { IEpubData, IEpubGenOptions, IGenConfigs, IOut } from './types'
+import { IChapterData, IEpubData, IEpubGenOptions, IGenConfigs, IOut } from './types'
 
 // 在 ES 模块中获取当前文件和目录路径
 const __filename = fileURLToPath(import.meta.url)
@@ -66,7 +67,10 @@ function check(options: IEpubGenOptions): IOut {
   return result(true, undefined, options)
 }
 
-function parseOptions(options: IEpubGenOptions): IEpubData {
+async function parseOptions(
+  options: IEpubGenOptions,
+  configs?: IGenConfigs,
+): Promise<IEpubData> {
   const tmpDir = options.tmpDir || os.tmpdir()
   const id = uuidv4()
 
@@ -94,6 +98,7 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
     images: [],
     content: [],
     log: (msg) => options.verbose && logger.log(msg),
+    _configs: configs,
   }
 
   if (data.version === 2) {
@@ -115,7 +120,18 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
     data.author = [data.author]
   }
 
-  data.content = options.content.map((content, index) => parseContent(content, index, data))
+  const total = options.content.length
+  const parsed: IChapterData[] = []
+  for (let i = 0; i < total; i++) {
+    parsed.push(parseContent(options.content[i], i, data))
+    // 每 32 章让出事件循环，让宿主 IPC / UI 事件得以处理
+    if ((i & 31) === 31) {
+      await new Promise<void>((r) => setImmediate(r))
+      emitProgress(configs, { phase: 'parseContent', current: i + 1, total })
+    }
+  }
+  emitProgress(configs, { phase: 'parseContent', current: total, total })
+  data.content = parsed
 
   if (data.cover) {
     data._coverMediaType = mime.getType(data.cover) || ''
@@ -126,6 +142,10 @@ function parseOptions(options: IEpubGenOptions): IEpubData {
 }
 
 export async function epubGen(options: IEpubGenOptions, configs?: IGenConfigs): Promise<IOut> {
+  // 归一化 concurrency：宿主可能传入 NaN / 字符串 / 负数等脏值
+  if (configs) {
+    configs = { ...configs, concurrency: normalizeConcurrency(configs.concurrency) }
+  }
   // 初始化全局 Logger
   if (configs?.logger) {
     logger.setLogger(configs.logger)
@@ -142,7 +162,7 @@ export async function epubGen(options: IEpubGenOptions, configs?: IGenConfigs): 
 
   let t: any
   try {
-    const data = parseOptions(options)
+    const data = await parseOptions(options, configs)
     const timeoutSeconds: number = data.timeoutSeconds || 0
 
     if (timeoutSeconds > 0) {
@@ -174,4 +194,15 @@ export default {
   errors,
 }
 
-export type { IChapter, IChapterData, IEpubData, IEpubGenOptions, IEpubImage, IOut } from './types'
+export type {
+  IChapter,
+  IChapterData,
+  IEpubData,
+  IEpubGenOptions,
+  IEpubImage,
+  IGenConfigs,
+  ILogger,
+  IOut,
+  IProgressEvent,
+  ProgressPhase,
+} from './types'

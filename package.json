@@ -1,6 +1,6 @@
 {
   "name": "wp-epub-gen",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Epub generator.",
   "type": "module",
   "main": "build/index.cjs",
@@ -22,7 +22,8 @@
     "build": "cross-env NODE_ENV=production vite build --config vite.config.ts",
     "bt": "npm run build && npm run test",
     "w": "tsc -w",
-    "p": "npm run build && npm run test && npm publish --access public"
+    "p": "npm publish --access public",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,9 @@
     "url": "https://github.com/oldj/wp-epub-gen/issues"
   },
   "homepage": "https://github.com/oldj/wp-epub-gen#readme",
+  "files": [
+    "build"
+  ],
   "dependencies": {
     "archiver": "^7.0.1",
     "cheerio": "^1.1.2",

@@ -45,6 +45,10 @@ export interface IEpubData extends IEpubGenOptions {
   baseDir: string
   _coverMediaType?: string
   _coverExtension?: string
+  /** @internal 由 epubGen() 填充，供下游阶段读取 onProgress / concurrency */
+  _configs?: IGenConfigs
+  /** @internal 图片 url -> 元数据，避免线性 find */
+  _imagesByUrl?: Map<string, IEpubImage>
   log: (msg: any) => void
   content: IChapterData[]
   timeoutSeconds: number
@@ -85,6 +89,23 @@ export interface ILogger {
   warn: (msg: any) => void
 }
 
+export type ProgressPhase =
+  | 'parseContent'
+  | 'writeChapters'
+  | 'buildToc'
+  | 'downloadImage'
+  | 'zip'
+
+export interface IProgressEvent {
+  phase: ProgressPhase
+  current: number
+  total: number
+  label?: string
+}
+
 export interface IGenConfigs {
   logger?: ILogger
+  onProgress?: (e: IProgressEvent) => void
+  /** 并发上限，默认 16；写盘和下载共用 */
+  concurrency?: number
 }

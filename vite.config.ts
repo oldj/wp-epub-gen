@@ -111,6 +111,7 @@ export default defineConfig({
     tsconfigPaths(),
     dts({
       entryRoot: path.join(__dirname, 'src'),
+      exclude: ['**/*.test.ts'],
       // outputDir: path.join(__dirname, 'build', 'types'),
     }),
   ],
