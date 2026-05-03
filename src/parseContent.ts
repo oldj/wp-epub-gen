@@ -322,7 +322,7 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
   try {
     const $ = cheerio.load(trimmedData, {
       xmlMode: true,
-      // @ts-ignore
+      // @ts-expect-error legacy htmlparser2 option still honored at runtime
       decodeEntities: false,
       lowerCaseTags: true,
       recognizeSelfClosing: true,
@@ -340,6 +340,7 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
   } catch (error) {
     throw new Error(
       `Failed to parse HTML content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { cause: error },
     )
   }
 }
@@ -449,7 +450,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
       id = uuidv4()
 
       // 错误处理：安全地获取MIME类型和扩展名
-      let mediaType: string = ''
+      let mediaType: string
       try {
         const cleanUrl = trimmedUrl.replace(/\?.*/, '') // 移除查询参数
         mediaType = mime.getType(cleanUrl) || ''

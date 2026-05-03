@@ -83,10 +83,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
     return html
   }
 
-  const flattenChapters = (
-    nodes: IChapterData[],
-    out: IChapterData[] = [],
-  ): IChapterData[] => {
+  const flattenChapters = (nodes: IChapterData[], out: IChapterData[] = []): IChapterData[] => {
     for (const c of nodes) {
       out.push(c)
       if (Array.isArray(c.children) && c.children.length) flattenChapters(c.children, out)
@@ -180,11 +177,7 @@ export const generateTempFile = async (epubData: IEpubData) => {
   emitProgress(epubData._configs, { phase: 'buildToc', current: 0, total: 3 })
   // 说明：toc.xhtml 的内容在 macOS 自带的 Books 会被当作目录显示，如果空格太多，目录显示可能会不正常，因此这儿简单去掉了不必要的空格
   await Promise.all([
-    fs.writeFile(
-      path.join(oebpsDir, 'content.opf'),
-      ejs.render(opfTemplate, epubData),
-      'utf-8',
-    ),
+    fs.writeFile(path.join(oebpsDir, 'content.opf'), ejs.render(opfTemplate, epubData), 'utf-8'),
     fs.writeFile(
       path.join(oebpsDir, 'toc.ncx'),
       ejs.render(ncxTocTemplate, { ...epubData, toc_depth }),

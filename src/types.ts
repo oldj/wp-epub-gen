@@ -89,12 +89,7 @@ export interface ILogger {
   warn: (msg: any) => void
 }
 
-export type ProgressPhase =
-  | 'parseContent'
-  | 'writeChapters'
-  | 'buildToc'
-  | 'downloadImage'
-  | 'zip'
+export type ProgressPhase = 'parseContent' | 'writeChapters' | 'buildToc' | 'downloadImage' | 'zip'
 
 export interface IProgressEvent {
   phase: ProgressPhase

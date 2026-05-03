@@ -15,109 +15,109 @@ npm install wp-epub-gen --save
 ### JavaScript (CommonJS)
 
 ```javascript
-const { epubGen } = require("wp-epub-gen");
+const { epubGen } = require('wp-epub-gen')
 
 epubGen({
-  title: "我的电子书",
-  author: "作者名",
-  output: "./my-book.epub",
+  title: '我的电子书',
+  author: '作者名',
+  output: './my-book.epub',
   content: [
     {
-      title: "第一章",
-      data: "<h1>第一章</h1><p>这是第一章的内容...</p>"
-    }
-  ]
+      title: '第一章',
+      data: '<h1>第一章</h1><p>这是第一章的内容...</p>',
+    },
+  ],
 }).then(
-  () => console.log("电子书生成成功！"),
-  err => console.error("生成失败：", err)
-);
+  () => console.log('电子书生成成功！'),
+  (err) => console.error('生成失败：', err),
+)
 ```
 
 ### TypeScript / ES 模块
 
 ```typescript
-import { epubGen, type IEpubGenOptions } from 'wp-epub-gen';
+import { epubGen, type IEpubGenOptions } from 'wp-epub-gen'
 
 const options: IEpubGenOptions = {
-  title: "我的电子书",
-  author: "作者名",
-  output: "./my-book.epub",
+  title: '我的电子书',
+  author: '作者名',
+  output: './my-book.epub',
   content: [
     {
-      title: "第一章",
-      data: "<h1>第一章</h1><p>这是第一章的内容...</p>"
-    }
-  ]
-};
+      title: '第一章',
+      data: '<h1>第一章</h1><p>这是第一章的内容...</p>',
+    },
+  ],
+}
 
 try {
-  const result = await epubGen(options);
+  const result = await epubGen(options)
   if (result.success) {
-    console.log("电子书生成成功！");
+    console.log('电子书生成成功！')
   } else {
-    console.error("生成失败：", result.message);
+    console.error('生成失败：', result.message)
   }
 } catch (error) {
-  console.error("发生错误：", error);
+  console.error('发生错误：', error)
 }
 ```
 
 ### 完整示例
 
 ```typescript
-import { epubGen } from 'wp-epub-gen';
+import { epubGen } from 'wp-epub-gen'
 
 const options = {
-  title: "完整示例电子书",
-  author: ["张三", "李四"],
-  publisher: "我的出版社",
-  cover: "https://example.com/cover.jpg",
-  output: "./complete-book.epub",
+  title: '完整示例电子书',
+  author: ['张三', '李四'],
+  publisher: '我的出版社',
+  cover: 'https://example.com/cover.jpg',
+  output: './complete-book.epub',
   version: 3,
-  lang: "zh-cn",
+  lang: 'zh-cn',
   css: "body { font-family: 'Microsoft YaHei', sans-serif; }",
-  tocTitle: "目录",
+  tocTitle: '目录',
   appendChapterTitles: true,
   tocAutoNumber: true,
   verbose: true,
   timeoutSeconds: 60,
   content: [
     {
-      title: "前言",
-      data: "<h1>前言</h1><p>这是前言内容...</p>",
-      beforeToc: true
+      title: '前言',
+      data: '<h1>前言</h1><p>这是前言内容...</p>',
+      beforeToc: true,
     },
     {
-      title: "第一部分",
-      data: "<h1>第一部分</h1>",
+      title: '第一部分',
+      data: '<h1>第一部分</h1>',
       children: [
         {
-          title: "第一章",
-          data: "<h2>第一章</h2><p>第一章内容...</p>"
+          title: '第一章',
+          data: '<h2>第一章</h2><p>第一章内容...</p>',
         },
         {
-          title: "第二章", 
-          data: "<h2>第二章</h2><p>第二章内容...</p>"
-        }
-      ]
+          title: '第二章',
+          data: '<h2>第二章</h2><p>第二章内容...</p>',
+        },
+      ],
     },
     {
-      title: "第二部分",
-      data: "<h1>第二部分</h1><p>第二部分内容...</p>"
+      title: '第二部分',
+      data: '<h1>第二部分</h1><p>第二部分内容...</p>',
     },
     {
-      title: "附录",
-      data: "<h1>附录</h1><p>附录内容...</p>",
-      excludeFromToc: true
-    }
-  ]
-};
+      title: '附录',
+      data: '<h1>附录</h1><p>附录内容...</p>',
+      excludeFromToc: true,
+    },
+  ],
+}
 
-epubGen(options).then(result => {
+epubGen(options).then((result) => {
   if (result.success) {
-    console.log("电子书生成成功！");
+    console.log('电子书生成成功！')
   }
-});
+})
 ```
 
 ## API 参考
@@ -127,10 +127,12 @@ epubGen(options).then(result => {
 主要的 EPUB 生成函数。
 
 **参数：**
+
 - `options: IEpubGenOptions` - 配置选项对象（标题、作者、封面、章节内容等）
 - `configs?: IGenConfigs` - 可选的运行时回调（logger、onProgress、concurrency），见下文 [IGenConfigs](#igenconfigs-运行时回调)
 
 **返回值：**
+
 - `Promise<IOut>` - 包含生成结果的 Promise
 
 ### IEpubGenOptions 配置选项
@@ -165,12 +167,13 @@ epubGen(options).then(result => {
 
 - **`fonts?: string[]`** - 自定义字体文件路径数组
   - 示例：`["/path/to/font.ttf"]`
-  
+
   使用方法：
+
   ```css
   @font-face {
-    font-family: "CustomFont";
-    src: url("./fonts/font.ttf");
+    font-family: 'CustomFont';
+    src: url('./fonts/font.ttf');
   }
   ```
 
@@ -199,7 +202,7 @@ epubGen(options).then(result => {
 #### 高级自定义选项
 
 - **`customOpfTemplatePath?: string`** - 自定义 OPF 模板文件路径
-- **`customNcxTocTemplatePath?: string`** - 自定义 NCX 目录模板文件路径  
+- **`customNcxTocTemplatePath?: string`** - 自定义 NCX 目录模板文件路径
 - **`customHtmlTocTemplatePath?: string`** - 自定义 HTML 目录模板文件路径
 
 ### IChapter 章节对象
@@ -227,9 +230,9 @@ epubGen(options).then(result => {
 
 ```typescript
 interface IOut {
-  success?: boolean;     // 是否成功
-  message?: string;      // 错误信息（如果失败）
-  options?: IEpubGenOptions; // 使用的配置选项
+  success?: boolean // 是否成功
+  message?: string // 错误信息（如果失败）
+  options?: IEpubGenOptions // 使用的配置选项
 }
 ```
 
@@ -239,9 +242,9 @@ interface IOut {
 
 ```typescript
 interface IGenConfigs {
-  logger?: ILogger;
-  onProgress?: (e: IProgressEvent) => void;
-  concurrency?: number;
+  logger?: ILogger
+  onProgress?: (e: IProgressEvent) => void
+  concurrency?: number
 }
 ```
 
@@ -251,10 +254,10 @@ interface IGenConfigs {
 
 ```typescript
 interface ILogger {
-  log: (msg: any) => void;
-  info: (msg: any) => void;
-  warn: (msg: any) => void;
-  error: (msg: any) => void;
+  log: (msg: any) => void
+  info: (msg: any) => void
+  warn: (msg: any) => void
+  error: (msg: any) => void
 }
 ```
 
@@ -264,17 +267,17 @@ interface ILogger {
 
 ```typescript
 type ProgressPhase =
-  | 'parseContent'    // 解析章节 HTML
-  | 'writeChapters'   // 写章节临时文件
-  | 'buildToc'        // 渲染 OPF / NCX / TOC
-  | 'downloadImage'   // 下载图片（仅当存在图片时）
-  | 'zip'             // 打包 .epub
+  | 'parseContent' // 解析章节 HTML
+  | 'writeChapters' // 写章节临时文件
+  | 'buildToc' // 渲染 OPF / NCX / TOC
+  | 'downloadImage' // 下载图片（仅当存在图片时）
+  | 'zip' // 打包 .epub
 
 interface IProgressEvent {
-  phase: ProgressPhase;
-  current: number;     // 已完成数量
-  total: number;       // 总数量
-  label?: string;      // 当前条目标签（章节标题 / 图片 URL）
+  phase: ProgressPhase
+  current: number // 已完成数量
+  total: number // 总数量
+  label?: string // 当前条目标签（章节标题 / 图片 URL）
 }
 ```
 
@@ -283,9 +286,9 @@ interface IProgressEvent {
 ```typescript
 await epubGen(options, {
   onProgress: (e) => {
-    console.log(`[${e.phase}] ${e.current}/${e.total}`);
+    console.log(`[${e.phase}] ${e.current}/${e.total}`)
   },
-});
+})
 ```
 
 回调中抛出的异常会被库静默吞掉，不会中断 EPUB 生成。
@@ -310,29 +313,29 @@ import type {
   IProgressEvent,
   ProgressPhase,
   IOut,
-} from 'wp-epub-gen';
+} from 'wp-epub-gen'
 ```
 
 ## 错误处理
 
 ```typescript
-import { epubGen, errors } from 'wp-epub-gen';
+import { epubGen, errors } from 'wp-epub-gen'
 
-const result = await epubGen(options);
+const result = await epubGen(options)
 
 if (!result.success) {
   switch (result.message) {
     case errors.no_title:
-      console.error("缺少标题");
-      break;
+      console.error('缺少标题')
+      break
     case errors.no_output_path:
-      console.error("缺少输出路径");
-      break;
+      console.error('缺少输出路径')
+      break
     case errors.no_content:
-      console.error("缺少内容");
-      break;
+      console.error('缺少内容')
+      break
     default:
-      console.error("未知错误：", result.message);
+      console.error('未知错误：', result.message)
   }
 }
 ```

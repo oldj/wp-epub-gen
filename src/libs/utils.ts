@@ -46,10 +46,7 @@ export function pLimit<T>(concurrency: number) {
     })
 }
 
-export function emitProgress(
-  configs: IGenConfigs | undefined,
-  event: IProgressEvent,
-): void {
+export function emitProgress(configs: IGenConfigs | undefined, event: IProgressEvent): void {
   if (!configs?.onProgress) return
   try {
     configs.onProgress(event)

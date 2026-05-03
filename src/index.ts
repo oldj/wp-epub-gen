@@ -67,10 +67,7 @@ function check(options: IEpubGenOptions): IOut {
   return result(true, undefined, options)
 }
 
-async function parseOptions(
-  options: IEpubGenOptions,
-  configs?: IGenConfigs,
-): Promise<IEpubData> {
+async function parseOptions(options: IEpubGenOptions, configs?: IGenConfigs): Promise<IEpubData> {
   const tmpDir = options.tmpDir || os.tmpdir()
   const id = uuidv4()
 
