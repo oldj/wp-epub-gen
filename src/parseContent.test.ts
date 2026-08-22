@@ -344,4 +344,109 @@ describe('parseContent', () => {
     expect(result.data).toContain('十六进制实体：&#x00A0;空格和&#x201C;左引号&#x201D;')
     expect(result.data).toContain('混合使用：&#160;和&nbsp;以及&#x00A0;')
   })
+
+  // ── void 元素回归 ─────────────────────────────────────────────────────────────
+  // 历史 bug：章节 HTML 曾以 xmlMode 解析，XML 没有 void 元素的概念，`<hr>` 会被当成未闭合的
+  // 开标签把后续兄弟节点吸成子节点，父元素闭合时补出 `</hr>`；随后那道「补自闭合斜线」的正则
+  // 又把开标签写成 `<hr/>`，产出 `<hr/>…</hr>`，阅读器按 XHTML 严格解析报
+  // "Opening and ending tag mismatch"，整章白屏。
+  //
+  // 注意 “所有 <br> 都以 /> 结尾” 这类遍历式断言查不出本 bug——错配的是**多出来的闭合标签**，
+  // 遍历只看得见开标签。故这里正面校验产物良构。
+
+  /**
+   * 极简 XHTML 良构校验：扫描标签做栈式配对。
+   * 仅供测试使用——输入是本文件构造的受控片段，不含注释 / CDATA / 处理指令。
+   * @returns 良构返回 null，否则返回错配描述
+   */
+  const findTagMismatch = (xhtml: string): string | null => {
+    const stack: string[] = []
+    const reg = /<(\/?)([a-zA-Z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g
+    let m: RegExpExecArray | null
+
+    while ((m = reg.exec(xhtml)) !== null) {
+      const [, closing, name, rest] = m
+      if (closing) {
+        const top = stack.pop()
+        if (top !== name) {
+          return `</${name}> mismatches ${top ? `<${top}>` : '(empty stack)'}`
+        }
+        continue
+      }
+      // 自闭合标签不入栈
+      if (!/\/\s*$/.test(rest)) stack.push(name)
+    }
+
+    return stack.length > 0 ? `<${stack[stack.length - 1]}> is never closed` : null
+  }
+
+  it('should produce well-formed XHTML when void tags have following siblings', () => {
+    const result = parseContent(
+      {
+        title: 'void 元素',
+        // 三个实测触发点：正文分隔线、脚注区分隔线、脚注内容里的换行
+        data:
+          '<div><p>正文一</p><hr><p>正文二</p>' +
+          '<div class="footnotes"><hr><ol><li id="fn-1">第一行<br>第二行 ' +
+          '<a href="#fnref-1">back</a></li></ol></div>' +
+          '<p>图<img src="a.png">尾</p></div>',
+      },
+      0,
+      mockEpubConfigs,
+    )
+
+    expect(findTagMismatch(result.data)).toBeNull()
+    // 孤儿闭合标签是本 bug 的直接指纹，单独钉死
+    expect(result.data).not.toMatch(/<\/(?:br|hr|img|input|meta|col|link|area|base|wbr)\s*>/i)
+    // void 元素不得吞掉后面的兄弟节点：三处内容都必须还在
+    expect(result.data).toContain('<p>正文二</p>')
+    expect(result.data).toContain('第一行<br/>第二行')
+    expect(result.data).toContain('尾</p>')
+    // 数量也要对，防止「良构但被吞掉一半」
+    expect(result.data.match(/<hr\s*\/>/g)).toHaveLength(2)
+    expect(result.data.match(/<br\s*\/>/g)).toHaveLength(1)
+  })
+
+  it('should not truncate void tags whose attribute value contains ">"', () => {
+    // 旧实现用 `<(br|hr|img|…)([^>]*?)…>` 事后修补，属性值里的 > 会把标签提前截断改坏
+    const result = parseContent(
+      { title: '属性含尖括号', data: '<p><img src="a.png" alt="a>b">尾</p>' },
+      0,
+      mockEpubConfigs,
+    )
+
+    expect(findTagMismatch(result.data)).toBeNull()
+    expect(result.data).toContain('alt="a>b"')
+    expect(result.data).toContain('尾')
+  })
+
+  it('should keep CJK text and entities untouched around void tags', () => {
+    // 防止解析器被换回 cheerio 默认的 parse5：它会把中文与既有实体重编码成 &#x....;
+    const result = parseContent(
+      { title: '实体保持', data: '<p>中文&nbsp;&amp;&#8220;引号&#8221;<br>下一行</p>' },
+      0,
+      mockEpubConfigs,
+    )
+
+    expect(result.data).toContain('中文&nbsp;&amp;&#8220;引号&#8221;<br/>下一行')
+  })
+
+  it('should keep void tags well-formed when EPUB2 rewrites disallowed tags', () => {
+    // EPUB2/XHTML1.1 路径会把白名单外的标签替换为 <div>，过程中走一次 html() 序列化 + 重新解析。
+    // 这里确认那次往返不会重新引入错配的 void 标签。
+    const result = parseContent(
+      {
+        title: 'EPUB2 标签替换',
+        data: '<section><p>甲<br>乙</p><hr><p>丙</p><img src="a.png">尾</section>',
+      },
+      0,
+      { ...mockEpubConfigs, version: 2 },
+    )
+
+    expect(findTagMismatch(result.data)).toBeNull()
+    expect(result.data).not.toMatch(/<\/(?:br|hr|img)\s*>/i)
+    expect(result.data).toContain('甲<br/>乙')
+    expect(result.data).toContain('<p>丙</p>')
+    expect(result.data).toContain('尾')
+  })
 })
