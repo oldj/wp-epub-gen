@@ -4,7 +4,11 @@
  */
 
 import safeFineName from '@/libs/safeFineName'
-import * as cheerio from 'cheerio'
+// 固定走 cheerio/slim：该入口的既定语义就是「always uses htmlparser2」，连 parse5 都不加载。
+// 不用「主入口 + `_useHtmlParser2`」——那是 cheerio 的 InternalOptions（私有），本包依赖范围为
+// ^1.2.0，下游可能装到更新的 1.x；该私有开关一旦被调整或移除就会静默退回 parse5，
+// 既有实体会被解码成裸字符（&amp; → &），直接产出无效 XHTML。
+import * as cheerio from 'cheerio/slim'
 import { remove as removeDiacritics } from 'diacritics'
 import path from 'path'
 import uslug from 'uslug'
@@ -303,6 +307,32 @@ function getAllowedXhtml11Tags(): readonly string[] {
 }
 
 /**
+ * 章节内容的解析选项。
+ *
+ * **必须用 HTML 模式解析（xmlMode: false）**：入参是 HTML，而 XML 没有 void 元素的概念，
+ * `<hr>` / `<br>` / `<img src=...>` 这类合法的 HTML 裸标签在 XML 模式下会被当成「未闭合的开标签」，
+ * 把后续兄弟节点全部吸成自己的子节点，直到父元素闭合时才补出 `</hr>`；序列化后就是
+ * `<hr/>…</hr>` 这种自相矛盾的标记，阅读器按 XHTML 严格解析直接报
+ * "Opening and ending tag mismatch"，整章白屏。XHTML 化（自闭合斜线）交由**序列化端**完成，
+ * 见 extractAndCleanHtmlContent。
+ *
+ * 解析与序列化固定由 htmlparser2 / dom-serializer 承担——见文件头 `cheerio/slim` 的 import 说明。
+ * 换回 cheerio 默认的 parse5 会改变既有产物：中文与既有实体（&nbsp; / &#10;）被重编码，
+ * 或反过来被解码成裸字符，两种都不是本包想要的输出。
+ *
+ * 下列开关都是 htmlparser2 选项，不在 cheerio 公开的 CheerioOptions 结构里，但 slim 入口下
+ * 它们必然生效。先 `satisfies` 公开的 HTMLParser2Options 做名称与类型校验——将来 cheerio 若
+ * 改名或删项会直接编译报错，而不是静默失效——再断言成 load() 的入参类型。
+ */
+const HTML_PARSE_OPTIONS = {
+  xmlMode: false,
+  decodeEntities: false,
+  lowerCaseTags: true,
+  recognizeSelfClosing: true,
+  lowerCaseAttributeNames: true,
+} satisfies cheerio.HTMLParser2Options as cheerio.CheerioOptions
+
+/**
  * 加载并处理HTML内容，提取body部分
  * @param data HTML字符串数据
  * @returns Cheerio实例
@@ -320,14 +350,7 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
   }
 
   try {
-    const $ = cheerio.load(trimmedData, {
-      xmlMode: true,
-      // @ts-ignore
-      decodeEntities: false,
-      lowerCaseTags: true,
-      recognizeSelfClosing: true,
-      lowerCaseAttributeNames: true,
-    })
+    const $ = cheerio.load(trimmedData, HTML_PARSE_OPTIONS)
 
     // only body innerHTML is allowed —— 把 body 子节点提升到 root，避免二次 cheerio.load
     const body = $('body')
@@ -340,6 +363,7 @@ function loadAndProcessHtml(data: string): cheerio.CheerioAPI {
   } catch (error) {
     throw new Error(
       `Failed to parse HTML content: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { cause: error },
     )
   }
 }
@@ -449,7 +473,7 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
       id = uuidv4()
 
       // 错误处理：安全地获取MIME类型和扩展名
-      let mediaType: string = ''
+      let mediaType: string
       try {
         const cleanUrl = trimmedUrl.replace(/\?.*/, '') // 移除查询参数
         mediaType = mime.getType(cleanUrl) || ''
@@ -503,33 +527,22 @@ function processImages($: cheerio.CheerioAPI, chapter: IChapterData, epubConfigs
 }
 
 /**
- * 提取并清理HTML内容，处理实体和自闭合标签
+ * 把处理完的 DOM 序列化为 XHTML 片段（不含 html/head/body 包裹）。
+ *
+ * 用 `$.xml()` 而非 `$.html()`：EPUB 章节是 XHTML，void 元素必须写成自闭合形式。
+ * 由 XML 序列化器统一产出，不再用正则事后修补——正则既补不干净（旧实现只剥了孤儿 `</img>`，
+ * 漏掉 `</br>` / `</hr>`），又会在属性值含 `>` 时（如 alt="a>b"）把标签截断改坏。
  */
 function extractAndCleanHtmlContent($: cheerio.CheerioAPI): string {
-  // Get the processed HTML content without wrapping html/head/body tags
-  let data: string
-  if ($('body').length) {
-    data = $('body').html() || ''
-  } else {
-    // For content without body tag, get the root content
-    data = $.root().html() || ''
+  // loadAndProcessHtml 已把 body 子节点提升到 root；这里再兜一次，兼容降级路径构造的 DOM
+  const body = $('body')
+  if (body.length) {
+    $.root().empty().append(body.contents())
   }
 
-  return (
-    data
-      // Convert self-closing tags to XHTML format
-      .replace(
-        /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)><\/\1>/gi,
-        '<$1$2/>',
-      )
-      // Convert remaining unclosed self-closing tags to XHTML format
-      .replace(
-        /<(br|hr|img|input|meta|area|base|col|embed|link|source|track|wbr)([^>]*?)(?<!\/)>/gi,
-        '<$1$2/>',
-      )
-      // Remove any stray closing </img> tags which are invalid in XHTML
-      .replace(/<\/img\s*>/gi, '')
-  )
+  // 必须无参调用：$.xml(dom) 传入 Cheerio 对象时，序列化沿用该对象自带的 options，
+  // 强制的 xmlMode 会被丢掉、退回 HTML 序列化（实测）。无参时渲染 root 的全部子节点。
+  return $.xml()
 }
 
 /**
@@ -578,8 +591,9 @@ export default function parseContent(
       $ = loadAndProcessHtml(chapter.data)
     } catch (error) {
       logger.error(`Failed to process HTML for chapter ${index}: ${error}`)
-      // 降级处理：创建包含原始文本的简单结构
-      $ = cheerio.load(`<div>${chapter.data}</div>`)
+      // 降级处理：创建包含原始文本的简单结构。必须沿用 HTML_PARSE_OPTIONS——
+      // cheerio 的默认选项会走 parse5，序列化时把中文与既有实体全部重编码
+      $ = cheerio.load(`<div>${chapter.data}</div>`, HTML_PARSE_OPTIONS)
     }
 
     processHtmlElements($, allowedAttributes, allowedXhtml11Tags, epubConfigs, index)

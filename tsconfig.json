@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "es2020",
+    "target": "es2022",
+    "module": "esnext",
     "allowJs": true,
     "sourceMap": true,
     "declaration": true,
+    "rootDir": "./src",
     "outDir": "./build",
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,28 +14,13 @@
     "useUnknownInCatchVariables": false,
     "noImplicitThis": true,
     "noImplicitReturns": true,
-    "moduleResolution": "node",
-    "lib": [
-      "es2020"
-    ],
-    "experimentalDecorators": true,
+    "moduleResolution": "bundler",
+    "lib": ["es2022"],
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "plugins": [],
-    "baseUrl": "./",
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "test",
-    "dist"
-  ],
-  "externals": {}
+  "include": ["src"],
+  "exclude": ["node_modules", "test", "dist"]
 }

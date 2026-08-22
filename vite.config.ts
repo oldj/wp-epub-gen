@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import * as path from 'path'
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
-import tsconfigPaths from 'vite-tsconfig-paths'
 
 /**
  * 生成模板文件的 TypeScript 代码
@@ -70,6 +69,10 @@ export const ${exportName} = \`${escapedContent}\``
   console.log(`Generated ${outputFile} with ${templates.length} templates`)
 }
 
+// 在 vite 加载插件前先生成模板文件，避免 vite-plugin-dts
+// 在文件不存在时漏掉 templates.d.ts 的发射
+generateTemplatesFile()
+
 // https://vitejs.dev/config/
 export default defineConfig({
   // root: path.join(__dirname, 'src', 'main'),
@@ -101,14 +104,6 @@ export default defineConfig({
     },
   },
   plugins: [
-    // 在构建前生成模板文件
-    {
-      name: 'generate-templates',
-      buildStart() {
-        generateTemplatesFile()
-      },
-    },
-    tsconfigPaths(),
     dts({
       entryRoot: path.join(__dirname, 'src'),
       exclude: ['**/*.test.ts'],

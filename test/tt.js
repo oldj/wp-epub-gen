@@ -3,13 +3,11 @@
  * @homepage: https://oldj.net
  */
 
-const {epubGen} = require('../build/index')
-const data = require('./data/1.json')
+import { epubGen } from '../build/index.js'
+import data from './data/1.json' with { type: 'json' }
 
-;(async () => {
-  try {
-    await epubGen({...data, tocAutoNumber: true}, 'test.epub')
-  } catch (e) {
-    console.error('Error 24: ' + e.message)
-  }
-})()
+try {
+  await epubGen({ ...data, tocAutoNumber: true, output: 'test.epub' })
+} catch (e) {
+  console.error('Error 24: ' + e.message)
+}

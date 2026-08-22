@@ -4,7 +4,7 @@
     "*.iml": true,
     "**/node_modules": true,
     "**/*.log": true,
-    "build": true,
+    "build": true
   },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
