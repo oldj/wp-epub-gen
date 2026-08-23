@@ -214,6 +214,11 @@ epubGen(options).then((result) => {
 - **`data: string`** - 章节的 HTML 内容
   - 网络图片：`<img src="https://example.com/image.jpg" />`
   - 本地图片：`<img src="file:///path/to/image.jpg" />`
+  - `<picture>`：只有 `<img>` 后备图会被打包，`<source>` 会被删除——`srcset` 里的地址不进图片管线（既不下载也不写进 manifest），留着就是指不到资源的非法元素。`<picture>` 里没有可用的 `<img>`（缺 `src`、`src` 为空、或只靠 `srcset` 给图）时，整个元素一并删除。响应式图片请直接给 `<img src>`
+  - 属性过滤：只保留白名单内的属性（`class` / `id` / `style` / `href` / `src` / `alt` / ARIA 等），另有两道校验
+    - **宿主标签**：`width` / `height` 只留在 `<img>` / `<object>` 等替换元素上（`version: 2` 另含 `<table>` / `<col>` / `<colgroup>`，`version: 3` 另含 `<video>` / `<canvas>`）；`type` 只留在 `<script>` / `<a>` / `<object>` / `<param>` / `<input>` / `<button>`（`version: 3` 另含 `<ol>` / `<source>` / `<embed>` / `<link>`）；`checked` 只留在 `<input type="checkbox">` / `<input type="radio">` 上，`disabled` 只留在 `<input>` / `<button>` / `<select>` / `<textarea>` / `<option>` / `<optgroup>` / `<fieldset>` 上。挂错标签的一律删除，例如 `<p width>`、`<div start>`、`<ul type>`、`<ul>` 里 `<li>` 的 `value`——`<ul>` 的项目符号请改用 CSS 的 `list-style-type`
+    - **属性值**：尺寸要求非负整数（`version: 2` 按 XHTML 1.1 的 `Length`，额外接受 `100%` 这类百分比；`version: 3` 按 HTML 只收整数），`<ol type>` 只收 `1` / `a` / `A` / `i` / `I`，`<input type>` / `<button type>` 只收各自的控件种类，`start` / `value` 要求整数，`reversed` / `checked` / `disabled` 只收 XML 的布尔写法（`attr=""` 或 `attr="attr"`，`version: 2` 更严，只收后者），`true` / `yes` 这类写法一律删除。值不合法就把整个属性删掉，避免 EPUBCheck 报错。Markdown 任务列表的 `<input type="checkbox" disabled checked>` 因此能原样带进 `version: 3` 的 EPUB；`name` / `value` 等其余表单属性仍不保留
+    - `version: 3` 额外保留 `<ol>` 的 `start` / `reversed` / `type`、有序列表里 `<li>` 的 `value`，以及 `data-*` 自定义数据属性；`version: 2` 按 XHTML 1.1 严格过滤，这些一律删除
 
 #### 可选属性
 

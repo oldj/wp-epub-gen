@@ -27,6 +27,7 @@ const mimeModule = require('mime/lite') as MimeModule | { default: MimeModule }
 const mime: MimeModule = (mimeModule as any).default || mimeModule
 
 // 性能优化：提取为常量，避免重复创建数组
+// 只列与标签无关的属性；width / height / type / start 等挂在特定元素上的，见下面的 *_TAG_SCOPED_ATTRIBUTES
 const ALLOWED_ATTRIBUTES: readonly string[] = [
   'about',
   'accesskey',
@@ -158,13 +159,260 @@ const ALLOWED_ATTRIBUTES: readonly string[] = [
   'tabindex',
   'target',
   'title', // 去除重复
-  'type',
   'typeof',
   'vocab',
   'xml:base',
   'xml:lang',
   'xml:space',
 ] as const
+
+/** HTML 的「有效非负整数」：尺寸属性只收这个 */
+const HTML5_NON_NEGATIVE_INTEGER = /^\d+$/
+/** HTML 的「有效整数」：start / value 可以是负数 */
+const HTML5_INTEGER = /^-?\d+$/
+/** XHTML 1.1 的 Length：像素数或百分比。注意 HTML5 不收百分比，两个版本在这里是分叉的 */
+const XHTML11_LENGTH = /^\d+%?$/
+/** XHTML 1.1 的 MultiLength：Length 再加 `2*` 这类相对宽度 */
+const XHTML11_MULTI_LENGTH = /^(?:\d+%?|\d*\*)$/
+/** ol 的列表标记种类，大小写有意义（a 和 A 不是一回事） */
+const OL_TYPE_KEYWORDS = /^[1aAiI]$/
+/** button 的 type 枚举 */
+const BUTTON_TYPE_KEYWORDS = new Set(['submit', 'reset', 'button'])
+/** input 的 type 枚举。HTML 的枚举属性大小写不敏感，比对前统一转小写 */
+const INPUT_TYPE_KEYWORDS = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'date',
+  'datetime-local',
+  'email',
+  'file',
+  'hidden',
+  'image',
+  'month',
+  'number',
+  'password',
+  'radio',
+  'range',
+  'reset',
+  'search',
+  'submit',
+  'tel',
+  'text',
+  'time',
+  'url',
+  'week',
+])
+/** checked 只适用于复选框和单选钮，别的种类上 HTML 写的是「must not be specified」 */
+const CHECKABLE_INPUT_TYPES = new Set(['checkbox', 'radio'])
+/** 支持 disabled 的表单元素。disabled 对所有 input 种类都适用，不用再看 type */
+const DISABLEABLE_TAGS = new Set([
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'optgroup',
+  'option',
+  'fieldset',
+])
+
+/** HTML 只在 li 的父节点不是这两个标签时才允许 value——无序列表没有序号可改 */
+const LIST_VALUE_FORBIDDEN_PARENTS = new Set(['ul', 'menu'])
+
+/**
+ * 布尔属性的合法写法。XML 语法不允许属性最小化，只能是 attr="" 或 attr="attr"，
+ * true / false 都不合法。XHTML 1.1 更严，连空串都不收，所以要区分版本。
+ */
+function isBooleanAttributeValue(value: string, attrName: string, isEpub3: boolean): boolean {
+  if (value.toLowerCase() === attrName) return true
+  return isEpub3 && value === ''
+}
+
+/** 判定属性去留时能看到的宿主信息 */
+interface AttributeHost {
+  tagName: string
+  parentTagName: string | undefined
+  /** 元素自身的属性，过滤前的原样。`<input type="checkbox" checked>` 里的 checked 得看 type */
+  attrs: Readonly<Record<string, string>>
+}
+
+/** 按标签限定的属性规则 */
+interface ScopedAttributeRule {
+  /** 允许出现该属性的标签 */
+  tags: ReadonlySet<string>
+  /** 值是否合法；缺省表示不校验 */
+  isValidValue?: (value: string, tagName: string, isEpub3: boolean) => boolean
+  /** 宿主还要满足的额外条件（父节点、或元素自身的其它属性）；缺省表示不限 */
+  isApplicable?: (host: AttributeHost) => boolean
+}
+
+/**
+ * 只挂在特定元素上的属性：属性名 -> 规则。登记在这里的属性以本表为准，不再回落到
+ * ALLOWED_ATTRIBUTES——否则 `<p width="200">`、`<div start="5">` 这类组合会被原样带进 XHTML，
+ * EPUBCheck 报 RSC-005。
+ * 宿主标签对了值也未必对：`<img width="100%">`、`<ol type="circle">` 名称与宿主都合法但值非法，
+ * 同样过不了校验，所以还要过一遍 isValidValue，不合法就把整个属性删掉。
+ * EPUB 2（XHTML 1.1）与 EPUB 3（HTML5）各一份——两边的宿主和值域都不一样。
+ */
+const XHTML11_TAG_SCOPED_ATTRIBUTES: ReadonlyMap<string, ScopedAttributeRule> = new Map([
+  [
+    'width',
+    {
+      // 固有尺寸来自 Image / Object 模块，表格宽度来自 Tables 模块
+      tags: new Set(['img', 'object', 'table', 'col', 'colgroup']),
+      isValidValue: (value: string, tagName: string) =>
+        (tagName === 'col' || tagName === 'colgroup' ? XHTML11_MULTI_LENGTH : XHTML11_LENGTH).test(
+          value,
+        ),
+    },
+  ],
+  [
+    'height',
+    {
+      // Tables 模块只给了 width，表格没有 height
+      tags: new Set(['img', 'object']),
+      isValidValue: (value: string) => XHTML11_LENGTH.test(value),
+    },
+  ],
+  [
+    'type',
+    {
+      // Forms 模块的 input / button 与 ContentType 的 a / object / param / script。
+      // 这里不校验值：EPUB 2 的标签过滤会把 input / button 整个换成 div，校验也是白校验
+      tags: new Set(['script', 'a', 'object', 'param', 'input', 'button']),
+    },
+  ],
+  [
+    'checked',
+    {
+      tags: new Set(['input']),
+      isValidValue: (value: string, _tagName: string, isEpub3: boolean) =>
+        isBooleanAttributeValue(value, 'checked', isEpub3),
+      // 只有复选框和单选钮能带 checked，`<input type="text" checked>` 过不了校验。
+      // 看的是过滤前的 type：type 自己要是非法值，它和 checked 会一起被删掉
+      isApplicable: ({ attrs }: AttributeHost) =>
+        CHECKABLE_INPUT_TYPES.has((attrs.type ?? '').toLowerCase()),
+    },
+  ],
+  [
+    'disabled',
+    {
+      tags: DISABLEABLE_TAGS,
+      isValidValue: (value: string, _tagName: string, isEpub3: boolean) =>
+        isBooleanAttributeValue(value, 'disabled', isEpub3),
+    },
+  ],
+])
+
+/**
+ * EPUB 3 额外放行的列表编号属性。此前 `<ol start="5">` 的 start 被删，续页或分段的有序列表
+ * 在阅读器里从 1 重数。
+ * 注意 ul 不在 type 的宿主里——HTML 只给 ul 全局属性，`<ul type="circle">` 属于废弃特性，
+ * 项目符号该走 CSS 的 list-style-type。
+ */
+const HTML5_TAG_SCOPED_ATTRIBUTES: ReadonlyMap<string, ScopedAttributeRule> = new Map([
+  [
+    'width',
+    {
+      // 尺寸属性只属于替换元素。不含 source——HTML 只给 <picture> 下的 source 尺寸，
+      // 而那种 source 会被整个丢掉（见 processHtmlElements）。
+      // 也不含 input：只有 type="image" 的 input 能带尺寸，判定要看元素自身的 type，
+      // 而 EPUB 里的表单本来就不工作，不值得为它把规则表复杂化
+      tags: new Set(['img', 'object', 'canvas', 'embed', 'iframe', 'video']),
+      isValidValue: (value: string) => HTML5_NON_NEGATIVE_INTEGER.test(value),
+    },
+  ],
+  [
+    'height',
+    {
+      tags: new Set(['img', 'object', 'canvas', 'embed', 'iframe', 'video']),
+      isValidValue: (value: string) => HTML5_NON_NEGATIVE_INTEGER.test(value),
+    },
+  ],
+  [
+    'type',
+    {
+      // 三类：ol 的列表标记种类、input / button 的控件种类（都是枚举，要校验），
+      // 以及 source / embed / object 等的 MIME 提示——它决定阅读器挑哪个媒体源，
+      // 值域太宽就不校验了
+      tags: new Set(['script', 'ol', 'a', 'link', 'object', 'embed', 'source', 'input', 'button']),
+      isValidValue: (value: string, tagName: string) => {
+        if (tagName === 'ol') return OL_TYPE_KEYWORDS.test(value)
+        if (tagName === 'input') return INPUT_TYPE_KEYWORDS.has(value.toLowerCase())
+        if (tagName === 'button') return BUTTON_TYPE_KEYWORDS.has(value.toLowerCase())
+        return true
+      },
+    },
+  ],
+  ['start', { tags: new Set(['ol']), isValidValue: (value: string) => HTML5_INTEGER.test(value) }],
+  [
+    'reversed',
+    {
+      tags: new Set(['ol']),
+      isValidValue: (value: string, _tagName: string, isEpub3: boolean) =>
+        isBooleanAttributeValue(value, 'reversed', isEpub3),
+    },
+  ],
+  [
+    'value',
+    {
+      tags: new Set(['li']),
+      isValidValue: (value: string) => HTML5_INTEGER.test(value),
+      isApplicable: ({ parentTagName }: AttributeHost) =>
+        !LIST_VALUE_FORBIDDEN_PARENTS.has(parentTagName ?? ''),
+    },
+  ],
+  [
+    'checked',
+    {
+      tags: new Set(['input']),
+      isValidValue: (value: string, _tagName: string, isEpub3: boolean) =>
+        isBooleanAttributeValue(value, 'checked', isEpub3),
+      // 只有复选框和单选钮能带 checked，`<input type="text" checked>` 过不了校验。
+      // 看的是过滤前的 type：type 自己要是非法值，它和 checked 会一起被删掉
+      isApplicable: ({ attrs }: AttributeHost) =>
+        CHECKABLE_INPUT_TYPES.has((attrs.type ?? '').toLowerCase()),
+    },
+  ],
+  [
+    'disabled',
+    {
+      tags: DISABLEABLE_TAGS,
+      isValidValue: (value: string, _tagName: string, isEpub3: boolean) =>
+        isBooleanAttributeValue(value, 'disabled', isEpub3),
+    },
+  ],
+])
+
+/**
+ * HTML5 自定义数据属性。下游用 data-list-style / data-full-width 等携带渲染语义，
+ * 书级 CSS 可以按属性选择器命中；XHTML 1.1 没有这一说，EPUB 2 照删。
+ */
+const EPUB3_DATA_ATTRIBUTE_PATTERN = /^data-[\w.-]+$/
+
+/**
+ * 判断某个标签上的属性是否保留。
+ * 先查按标签限定的表（命中即以该表为准，宿主、值、父节点三关都要过），再查与标签无关的
+ * 全局白名单，最后是 EPUB 3 的 data-*。
+ */
+function isAttributeAllowed(
+  attrName: string,
+  attrValue: string,
+  host: AttributeHost,
+  version: 2 | 3,
+): boolean {
+  const isEpub3 = version === 3
+  const rule = (isEpub3 ? HTML5_TAG_SCOPED_ATTRIBUTES : XHTML11_TAG_SCOPED_ATTRIBUTES).get(attrName)
+  if (rule) {
+    return (
+      rule.tags.has(host.tagName) &&
+      (rule.isValidValue?.(attrValue, host.tagName, isEpub3) ?? true) &&
+      (rule.isApplicable?.(host) ?? true)
+    )
+  }
+  if (ALLOWED_ATTRIBUTES_SET.has(attrName)) return true
+  return isEpub3 && EPUB3_DATA_ATTRIBUTE_PATTERN.test(attrName)
+}
 
 /**
  * XHTML 1.1允许的标签列表
@@ -379,7 +627,6 @@ function processHtmlElements(
   index: number | string,
 ): void {
   // 性能优化：使用 Set 进行快速查找，避免重复的 includes 调用
-  const allowedAttrsSet = ALLOWED_ATTRIBUTES_SET
   const allowedTagsSet = ALLOWED_XHTML11_TAGS_SET
   const selfClosingTags = SELF_CLOSING_TAGS
 
@@ -387,6 +634,21 @@ function processHtmlElements(
     const attrs = elem.attribs || {}
     const $elem = $(elem)
     const tagName = elem.name
+    const parentTagName: string | undefined = elem.parent?.name
+
+    // <picture> 下的 source 必须带 srcset，而 srcset 里的地址进不了图片管线——processImages
+    // 只认 img 的 src，那些图既不会被下载也不会写进 manifest。留着就是个指不到任何资源的
+    // 非法元素，不如丢掉，让后备的 <img> 去显示：那张才是真正打包进 EPUB 的图。
+    // 空掉的 picture 由 removeEmptyPictures 收尾——那要等图片管线跑完才算得准
+    if (tagName === 'source' && parentTagName === 'picture') {
+      if (epubConfigs.verbose) {
+        logger.warn(
+          `Warning (content[${index}]): <source> inside <picture> isn't supported (srcset images aren't packaged), removed.`,
+        )
+      }
+      $elem.remove()
+      return
+    }
 
     // 处理自闭合标签的特殊属性
     if (selfClosingTags.has(tagName)) {
@@ -397,13 +659,15 @@ function processHtmlElements(
 
     // 性能优化：批量处理属性，减少 DOM 操作
     const attrsToRemove: string[] = []
-    for (const [attrName] of Object.entries(attrs)) {
-      if (allowedAttrsSet.has(attrName)) {
-        // 特殊处理 type 属性
-        if (attrName === 'type' && tagName !== 'script') {
-          attrsToRemove.push(attrName)
-        }
-      } else {
+    const host: AttributeHost = { tagName, parentTagName, attrs }
+    for (const [attrName, attrValue] of Object.entries(attrs)) {
+      const allowed = isAttributeAllowed(
+        attrName,
+        String(attrValue ?? ''),
+        host,
+        epubConfigs.version === 2 ? 2 : 3,
+      )
+      if (!allowed) {
         attrsToRemove.push(attrName)
       }
     }
@@ -425,6 +689,32 @@ function processHtmlElements(
         $elem.replaceWith($('<div>' + child + '</div>'))
       }
     }
+  })
+}
+
+/**
+ * 清掉没有后备 img 的 picture。HTML 的内容模型要求 picture 里有一个 img，空 picture 不合法，
+ * EPUBCheck 会报 RSC-005。
+ *
+ * 必须排在 processImages 之后：src 为空或缺失的 img 是在那一步才被删掉的，
+ * `<picture><img src=""></picture>` 和只靠 srcset 给图的 `<picture><img srcset="…"></picture>`
+ * （srcset 不在白名单里，过滤后 img 就没有 src 了）都是那时才空下来。放在属性过滤阶段判断会漏。
+ *
+ * EPUB 2 里 picture 早在标签过滤时就换成了 div，这里选不中，留下的空 div 本身是合法的。
+ */
+function removeEmptyPictures(
+  $: cheerio.CheerioAPI,
+  epubConfigs: IEpubData,
+  index: number | string,
+): void {
+  $('picture').each((_elemIndex: number, elem: any) => {
+    const $elem = $(elem)
+    if ($elem.find('img').length > 0) return
+
+    if (epubConfigs.verbose) {
+      logger.warn(`Warning (content[${index}]): <picture> without a usable <img> removed.`)
+    }
+    $elem.remove()
   })
 }
 
@@ -598,6 +888,7 @@ export default function parseContent(
 
     processHtmlElements($, allowedAttributes, allowedXhtml11Tags, epubConfigs, index)
     processImages($, chapter, epubConfigs)
+    removeEmptyPictures($, epubConfigs, index)
 
     chapter.data = extractAndCleanHtmlContent($)
   }
