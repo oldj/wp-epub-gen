@@ -449,4 +449,292 @@ describe('parseContent', () => {
     expect(result.data).toContain('<p>丙</p>')
     expect(result.data).toContain('尾')
   })
+
+  describe('属性白名单', () => {
+    // 有序列表的编号属性 + 自定义数据属性 + 图片尺寸；unknownattr 用来确认过滤仍在
+    const LIST_HTML =
+      '<ol start="5" reversed="reversed" type="a" data-list-style="lower-alpha" style="list-style-type: lower-alpha" unknownattr="x">' +
+      '<li value="7">甲</li></ol>' +
+      '<ul type="circle" data-x.y_z="1"><li value="3">乙</li></ul>' +
+      '<img src="a.png" width="320" height="240" data-full-width="1" alt="p">' +
+      '<input type="text" id="n">'
+
+    it('EPUB 3：保留 ol 的 start / reversed / type、ol > li 的 value、data-* 与 style', () => {
+      // 回归：此前 start 不在白名单里，<ol start="5"> 在阅读器里从 1 重数；data-* 也被整体丢弃
+      const result = parseContent({ title: '列表属性', data: LIST_HTML }, 0, mockEpubConfigs)
+      expect(result.data).toMatch(/<ol\b[^>]*\bstart="5"/)
+      expect(result.data).toMatch(/<ol\b[^>]*\breversed="reversed"/)
+      expect(result.data).toMatch(/<ol\b[^>]*\btype="a"/)
+      expect(result.data).toMatch(/<ol\b[^>]*\bdata-list-style="lower-alpha"/)
+      expect(result.data).toMatch(/<ol\b[^>]*\bstyle="list-style-type: lower-alpha"/)
+      expect(result.data).toMatch(/<li\b[^>]*\bvalue="7"/)
+      // data-* 是全局属性，ul 上照留
+      expect(result.data).toMatch(/<ul\b[^>]*\bdata-x\.y_z="1"/)
+      expect(result.data).toMatch(/<img\b[^>]*\bdata-full-width="1"/)
+      // 过滤没有失效：白名单外的属性照删
+      expect(result.data).not.toContain('unknownattr')
+      expect(result.data).toMatch(/<input\b[^>]*\bid="n"/)
+    })
+
+    it('EPUB 3：列表编号属性挂错标签时删除', () => {
+      // HTML 只给 ul 全局属性，<ul type="circle"> 是废弃特性；无序列表里的 li 也没有序号可改。
+      // 放行会让 EPUBCheck 报 RSC-005，项目符号该走 CSS 的 list-style-type
+      const result = parseContent({ title: '列表属性', data: LIST_HTML }, 0, mockEpubConfigs)
+      expect(result.data).not.toMatch(/<ul\b[^>]*\btype=/)
+      // ul 下的 li 丢掉 value 后不该再剩属性
+      expect(result.data).toMatch(/<ul\b[^>]*><li>乙<\/li><\/ul>/)
+
+      const other = parseContent(
+        {
+          title: '挂错标签',
+          data:
+            '<div start="5" reversed="reversed" value="2">丙</div>' +
+            '<p width="200" height="100">丁</p>' +
+            '<span type="a">戊</span>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(other.data).not.toMatch(/\bstart=/)
+      expect(other.data).not.toMatch(/\breversed=/)
+      expect(other.data).not.toMatch(/\bvalue=/)
+      expect(other.data).not.toMatch(/\bwidth=/)
+      expect(other.data).not.toMatch(/\bheight=/)
+      expect(other.data).not.toMatch(/\btype=/)
+      expect(other.data).toContain('丙')
+      expect(other.data).toContain('丁')
+      expect(other.data).toContain('戊')
+    })
+
+    it('EPUB 2：XHTML 1.1 没有的 start / reversed / value / type / data-* 仍被删掉', () => {
+      const result = parseContent({ title: '列表属性', data: LIST_HTML }, 0, {
+        ...mockEpubConfigs,
+        version: 2,
+      })
+      expect(result.data).not.toMatch(/\bstart=/)
+      expect(result.data).not.toMatch(/\breversed=/)
+      expect(result.data).not.toMatch(/\bvalue=/)
+      expect(result.data).not.toMatch(/\btype=/)
+      expect(result.data).not.toMatch(/\bdata-/)
+      // 基础白名单里的 style 两个版本都保留——单个列表的指定格式靠它
+      expect(result.data).toMatch(/<ol\b[^>]*\bstyle="list-style-type: lower-alpha"/)
+    })
+
+    it('img 的 width / height 两个版本都保留（XHTML 1.1 本就允许），非替换元素上删除', () => {
+      for (const version of [2, 3] as const) {
+        const result = parseContent({ title: '图片尺寸', data: LIST_HTML }, 0, {
+          ...mockEpubConfigs,
+          version,
+        })
+        expect(result.data).toMatch(/<img\b[^>]*\bwidth="320"/)
+        expect(result.data).toMatch(/<img\b[^>]*\bheight="240"/)
+
+        // 尺寸只属于图片 / 对象一类的替换元素，<p width> 会让 EPUBCheck 报错
+        const para = parseContent(
+          { title: '段落尺寸', data: '<p width="200" height="100">丁</p>' },
+          0,
+          { ...mockEpubConfigs, version },
+        )
+        expect(para.data).not.toMatch(/\bwidth=/)
+        expect(para.data).not.toMatch(/\bheight=/)
+      }
+    })
+
+    it('宿主对了值不对的属性照删（尺寸、ol 的枚举与整数、reversed 的布尔写法）', () => {
+      const bad = parseContent(
+        {
+          title: '非法值',
+          data:
+            '<img src="a.png" width="100%" height="auto" alt="p">' +
+            '<ol type="circle" start="abc" reversed="true"><li value="x">甲</li></ol>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      // HTML 的尺寸属性要求「有效非负整数」，百分比宽度在旧 HTML 里很常见，留着会让 EPUBCheck 报错
+      expect(bad.data).not.toMatch(/\bwidth=/)
+      expect(bad.data).not.toMatch(/\bheight=/)
+      expect(bad.data).not.toMatch(/\btype=/)
+      expect(bad.data).not.toMatch(/\bstart=/)
+      expect(bad.data).not.toMatch(/\breversed=/)
+      expect(bad.data).not.toMatch(/\bvalue=/)
+
+      const good = parseContent(
+        {
+          title: '合法值',
+          data: '<ol type="a" start="-3" reversed="reversed"><li value="7">甲</li></ol>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      // start / value 是「有效整数」，负数合法
+      expect(good.data).toMatch(/<ol\b[^>]*\btype="a"/)
+      expect(good.data).toMatch(/<ol\b[^>]*\bstart="-3"/)
+      expect(good.data).toMatch(/<ol\b[^>]*\breversed="reversed"/)
+      expect(good.data).toMatch(/<li\b[^>]*\bvalue="7"/)
+
+      // 光秃秃的 <ol reversed> 会被解析成空串，那是 XML 语法下合法的布尔写法
+      const bare = parseContent(
+        { title: '布尔', data: '<ol reversed><li>甲</li></ol>' },
+        0,
+        mockEpubConfigs,
+      )
+      expect(bare.data).toMatch(/<ol\b[^>]*\breversed=""/)
+    })
+
+    it('EPUB 2 的 Length 允许百分比，EPUB 3 不允许', () => {
+      // XHTML 1.1 里 img 的 width/height 是 Length（像素或百分比），HTML5 收窄成了非负整数
+      const html = '<img src="a.png" width="100%" alt="p">'
+      const v2 = parseContent({ title: '百分比', data: html }, 0, {
+        ...mockEpubConfigs,
+        version: 2,
+      })
+      expect(v2.data).toMatch(/<img\b[^>]*\bwidth="100%"/)
+
+      const v3 = parseContent({ title: '百分比', data: html }, 0, mockEpubConfigs)
+      expect(v3.data).not.toMatch(/\bwidth=/)
+    })
+
+    it('type 保留在 MIME 提示的宿主上，表单控件的仍旧删除', () => {
+      // <source type> 决定阅读器挑哪个媒体源，<object type> 影响渲染，删掉是实打实的信息损失
+      const data =
+        '<video><source src="v.mp4" type="video/mp4"></video>' +
+        '<object type="image/svg+xml"></object>' +
+        '<a href="x" type="text/html">L</a>' +
+        '<input type="checkbox"><button type="submit">b</button>'
+      const result = parseContent({ title: 'type 宿主', data }, 0, mockEpubConfigs)
+      expect(result.data).toMatch(/<source\b[^>]*\btype="video\/mp4"/)
+      expect(result.data).toMatch(/<object\b[^>]*\btype="image\/svg\+xml"/)
+      expect(result.data).toMatch(/<a\b[^>]*\btype="text\/html"/)
+      expect(result.data).toMatch(/<input\b[^>]*\btype="checkbox"/)
+      expect(result.data).toMatch(/<button\b[^>]*\btype="submit"/)
+    })
+
+    it('input / button 的 type 按枚举校验，写错的值删掉', () => {
+      const result = parseContent(
+        {
+          title: '控件种类',
+          data: '<input type="frobnicate"><button type="lol">b</button><input type="TEXT">',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).not.toMatch(/<input\b[^>]*\btype="frobnicate"/)
+      expect(result.data).not.toMatch(/<button\b[^>]*\btype=/)
+      // HTML 的枚举属性大小写不敏感，TEXT 合法且原样留着
+      expect(result.data).toMatch(/<input\b[^>]*\btype="TEXT"/)
+    })
+
+    it('checked / disabled：Markdown 任务列表能原样带过去', () => {
+      const result = parseContent(
+        {
+          title: '任务列表',
+          data:
+            '<ul><li><input type="checkbox" disabled checked>做完了</li>' +
+            '<li><input type="checkbox" disabled>没做</li></ul>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      // 光秃秃的布尔属性会被解析成空串，那是 XML 语法下合法的写法
+      expect(result.data).toMatch(/<input\b[^>]*\btype="checkbox"[^>]*\bchecked=""/)
+      expect(result.data).toMatch(/<input\b[^>]*\bdisabled=""/)
+      expect((result.data.match(/\bdisabled=/g) || []).length).toBe(2)
+      expect((result.data.match(/\bchecked=/g) || []).length).toBe(1)
+    })
+
+    it('checked 只跟着复选框和单选钮，别处一律删除', () => {
+      const result = parseContent(
+        {
+          title: 'checked 宿主',
+          data:
+            '<input type="radio" checked="checked">' +
+            '<input type="text" checked><input checked><p checked>x</p>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).toMatch(/<input\b[^>]*\btype="radio"[^>]*\bchecked="checked"/)
+      // 文本框、没写 type（默认就是文本框）、非表单元素上 HTML 都写着 must not be specified
+      expect((result.data.match(/\bchecked=/g) || []).length).toBe(1)
+      expect(result.data).not.toMatch(/<p\b[^>]*\bchecked=/)
+
+      // type 自己是非法值时，它和依赖它的 checked 一起删；disabled 与 type 无关，照留
+      const badType = parseContent(
+        { title: 'type 非法', data: '<input type="frobnicate" checked disabled>' },
+        0,
+        mockEpubConfigs,
+      )
+      expect(badType.data).not.toMatch(/\btype=/)
+      expect(badType.data).not.toMatch(/\bchecked=/)
+      expect(badType.data).toMatch(/\bdisabled=""/)
+    })
+
+    it('布尔属性只收 XML 的两种写法，true / yes 一律删除', () => {
+      const result = parseContent(
+        {
+          title: '布尔写法',
+          data: '<input type="checkbox" checked="true"><input type="checkbox" checked="yes">',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).not.toMatch(/\bchecked=/)
+      expect((result.data.match(/<input\b/g) || []).length).toBe(2)
+    })
+
+    it('disabled 只跟着表单元素', () => {
+      const result = parseContent(
+        {
+          title: 'disabled 宿主',
+          data:
+            '<button disabled>b</button><select disabled></select>' +
+            '<textarea disabled></textarea><fieldset disabled></fieldset><p disabled>x</p>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).toMatch(/<button\b[^>]*\bdisabled=""/)
+      expect(result.data).toMatch(/<select\b[^>]*\bdisabled=""/)
+      expect(result.data).toMatch(/<textarea\b[^>]*\bdisabled=""/)
+      expect(result.data).toMatch(/<fieldset\b[^>]*\bdisabled=""/)
+      expect(result.data).not.toMatch(/<p\b[^>]*\bdisabled=/)
+    })
+
+    it('表格宽度只在 EPUB 2 合法', () => {
+      // XHTML 1.1 Tables 模块给了 table 的 Length 和 col/colgroup 的 MultiLength；HTML5 已废弃
+      const table =
+        '<table width="100%"><colgroup><col width="2*"></colgroup><tr><td>a</td></tr></table>'
+      const v2 = parseContent({ title: '表格', data: table }, 0, { ...mockEpubConfigs, version: 2 })
+      expect(v2.data).toMatch(/<table\b[^>]*\bwidth="100%"/)
+      expect(v2.data).toMatch(/<col\b[^>]*\bwidth="2\*"/)
+
+      const v3 = parseContent({ title: '表格', data: table }, 0, mockEpubConfigs)
+      expect(v3.data).not.toMatch(/\bwidth=/)
+    })
+
+    it('video / audio 下的 source 没有尺寸属性', () => {
+      const result = parseContent(
+        {
+          title: 'video',
+          data: '<video><source src="v.mp4" type="video/mp4" width="640"></video>',
+        },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).toMatch(/<source\b[^>]*\btype="video\/mp4"/)
+      expect(result.data).not.toMatch(/\bwidth=/)
+    })
+
+    it('data-* 只认合法的属性名，带其它字符的一律删除', () => {
+      const result = parseContent(
+        { title: 'data 名', data: '<p data-ok="1" data-="2" data-a b="3" data-bad@="4">x</p>' },
+        0,
+        mockEpubConfigs,
+      )
+      expect(result.data).toMatch(/<p\b[^>]*\bdata-ok="1"/)
+      expect(result.data).not.toMatch(/\bdata-="2"/)
+      expect(result.data).not.toMatch(/\bdata-bad@=/)
+    })
+  })
 })
