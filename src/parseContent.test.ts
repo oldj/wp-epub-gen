@@ -726,6 +726,73 @@ describe('parseContent', () => {
       expect(result.data).not.toMatch(/\bwidth=/)
     })
 
+    describe('picture', () => {
+      // HTML 要求 picture 下的 source 必须带 srcset，而 srcset 里的地址进不了图片管线
+      // （processImages 只认 img 的 src），既不下载也不写进 manifest。与其留个指不到资源的
+      // 非法 source，不如丢掉，让后备的 img 顶上——那张才是真正打包进 EPUB 的图
+      it('丢掉 source，保留被打包的后备 img', () => {
+        for (const version of [2, 3] as const) {
+          const result = parseContent(
+            {
+              title: 'picture',
+              data:
+                '<picture><source srcset="only-in-srcset.png 2x" type="image/png" width="640" height="480">' +
+                '<img src="fallback.png" alt="x"></picture>',
+            },
+            0,
+            { ...mockEpubConfigs, version },
+          )
+          expect(result.data).not.toContain('<source')
+          expect(result.data).not.toContain('srcset')
+          // 名字要挑十六进制 UUID 撞不上的：'a.png' 会被 images/…45aa.png 这种文件名意外命中
+          expect(result.data).not.toContain('only-in-srcset')
+          // 后备图照常进图片管线，src 被改写成包内路径
+          expect(result.data).toMatch(/<img\b[^>]*\bsrc="images\/[^"]+"/)
+          expect(result.data).toMatch(/<img\b[^>]*\balt="x"/)
+        }
+      })
+
+      it('后备 img 被图片管线丢掉之后，空下来的 picture 也要清掉', () => {
+        // processImages 会删掉 src 为空/缺失的 img，picture 是在那一步之后才空的，
+        // 所以清理必须排在图片处理之后——放在属性过滤阶段判断会漏掉这几种
+        const cases: [string, string][] = [
+          [
+            'src 为空',
+            '<picture><source srcset="only-in-srcset.png"><img src="" alt="x"></picture>',
+          ],
+          ['只靠 srcset 给图', '<picture><img srcset="only-in-srcset.png" alt="x"></picture>'],
+          ['没有 src', '<picture><img alt="x"></picture>'],
+          ['src 全是空白', '<picture><img src="   " alt="x"></picture>'],
+        ]
+        for (const [name, inner] of cases) {
+          const result = parseContent(
+            { title: 'picture', data: `<p>前</p>${inner}<p>后</p>` },
+            0,
+            mockEpubConfigs,
+          )
+          expect(result.data, name).not.toContain('<picture')
+          expect(result.data, name).toContain('<p>前</p>')
+          expect(result.data, name).toContain('<p>后</p>')
+        }
+      })
+
+      it('没有后备 img 时整个 picture 一起丢掉（内容模型要求有一个 img）', () => {
+        const result = parseContent(
+          {
+            title: 'picture',
+            data: '<p>前</p><picture><source srcset="only-in-srcset.png"></picture><p>后</p>',
+          },
+          0,
+          mockEpubConfigs,
+        )
+        expect(result.data).not.toContain('<picture')
+        expect(result.data).not.toContain('<source')
+        // 只丢 picture，前后文照旧
+        expect(result.data).toContain('<p>前</p>')
+        expect(result.data).toContain('<p>后</p>')
+      })
+    })
+
     it('data-* 只认合法的属性名，带其它字符的一律删除', () => {
       const result = parseContent(
         { title: 'data 名', data: '<p data-ok="1" data-="2" data-a b="3" data-bad@="4">x</p>' },

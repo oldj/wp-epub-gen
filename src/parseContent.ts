@@ -315,7 +315,7 @@ const HTML5_TAG_SCOPED_ATTRIBUTES: ReadonlyMap<string, ScopedAttributeRule> = ne
     'width',
     {
       // 尺寸属性只属于替换元素。不含 source——HTML 只给 <picture> 下的 source 尺寸，
-      // 而 srcset 里的图进不了本项目的图片管线，那种 source 本来就用不上。
+      // 而那种 source 会被整个丢掉（见 processHtmlElements）。
       // 也不含 input：只有 type="image" 的 input 能带尺寸，判定要看元素自身的 type，
       // 而 EPUB 里的表单本来就不工作，不值得为它把规则表复杂化
       tags: new Set(['img', 'object', 'canvas', 'embed', 'iframe', 'video']),
@@ -636,6 +636,20 @@ function processHtmlElements(
     const tagName = elem.name
     const parentTagName: string | undefined = elem.parent?.name
 
+    // <picture> 下的 source 必须带 srcset，而 srcset 里的地址进不了图片管线——processImages
+    // 只认 img 的 src，那些图既不会被下载也不会写进 manifest。留着就是个指不到任何资源的
+    // 非法元素，不如丢掉，让后备的 <img> 去显示：那张才是真正打包进 EPUB 的图。
+    // 空掉的 picture 由 removeEmptyPictures 收尾——那要等图片管线跑完才算得准
+    if (tagName === 'source' && parentTagName === 'picture') {
+      if (epubConfigs.verbose) {
+        logger.warn(
+          `Warning (content[${index}]): <source> inside <picture> isn't supported (srcset images aren't packaged), removed.`,
+        )
+      }
+      $elem.remove()
+      return
+    }
+
     // 处理自闭合标签的特殊属性
     if (selfClosingTags.has(tagName)) {
       if (tagName === 'img' && !$elem.attr('alt')) {
@@ -675,6 +689,32 @@ function processHtmlElements(
         $elem.replaceWith($('<div>' + child + '</div>'))
       }
     }
+  })
+}
+
+/**
+ * 清掉没有后备 img 的 picture。HTML 的内容模型要求 picture 里有一个 img，空 picture 不合法，
+ * EPUBCheck 会报 RSC-005。
+ *
+ * 必须排在 processImages 之后：src 为空或缺失的 img 是在那一步才被删掉的，
+ * `<picture><img src=""></picture>` 和只靠 srcset 给图的 `<picture><img srcset="…"></picture>`
+ * （srcset 不在白名单里，过滤后 img 就没有 src 了）都是那时才空下来。放在属性过滤阶段判断会漏。
+ *
+ * EPUB 2 里 picture 早在标签过滤时就换成了 div，这里选不中，留下的空 div 本身是合法的。
+ */
+function removeEmptyPictures(
+  $: cheerio.CheerioAPI,
+  epubConfigs: IEpubData,
+  index: number | string,
+): void {
+  $('picture').each((_elemIndex: number, elem: any) => {
+    const $elem = $(elem)
+    if ($elem.find('img').length > 0) return
+
+    if (epubConfigs.verbose) {
+      logger.warn(`Warning (content[${index}]): <picture> without a usable <img> removed.`)
+    }
+    $elem.remove()
   })
 }
 
@@ -848,6 +888,7 @@ export default function parseContent(
 
     processHtmlElements($, allowedAttributes, allowedXhtml11Tags, epubConfigs, index)
     processImages($, chapter, epubConfigs)
+    removeEmptyPictures($, epubConfigs, index)
 
     chapter.data = extractAndCleanHtmlContent($)
   }
